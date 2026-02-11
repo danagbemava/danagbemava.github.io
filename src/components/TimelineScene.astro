@@ -1,0 +1,64 @@
+---
+interface TimelineEntry {
+  title: string;
+  url: string;
+  dateLabel: string;
+  tags: string;
+  summary: string;
+}
+
+interface Props {
+  kind: "projects" | "posts";
+  title: string;
+  description: string;
+  entries: TimelineEntry[];
+}
+
+const { kind, title, description, entries } = Astro.props;
+const entriesJson = JSON.stringify(entries).replace(/<\/script/gi, "<\\/script");
+---
+
+<section class="timeline-shell" data-kind={kind}>
+  <canvas id="timeline-canvas" class="timeline-canvas" data-kind={kind} aria-label={`${title} timeline scene`}></canvas>
+
+  <aside class="timeline-ui">
+    <p class="kicker">{kind === "posts" ? "Posts Timeline" : "Projects Timeline"}</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    <p class="timeline-help">Controls: WASD or arrows to move. Press E or click a door to open it.</p>
+  </aside>
+
+  <div class="timeline-hud">
+    <p class="timeline-chip" id="timeline-status">Loading timeline world...</p>
+    <p class="timeline-chip" id="timeline-prompt"></p>
+    <button class="timeline-chip timeline-mute-btn" id="timeline-mute" type="button" aria-label="Toggle sound">🔊 Sound</button>
+  </div>
+
+  <noscript>
+    <div class="timeline-ui">
+      <h2>Entries</h2>
+      <ul class="list">
+        {entries.map((entry) => (
+          <li>
+            <a href={entry.url}>{entry.title}</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </noscript>
+</section>
+
+<div class="timeline-modal" id="timeline-modal" hidden aria-hidden="true">
+  <article class="timeline-modal-card" role="dialog" aria-modal="true" aria-labelledby="timeline-modal-title">
+    <button id="timeline-modal-close" class="timeline-modal-close" type="button" aria-label="Close details">Close</button>
+    <p id="timeline-modal-meta" class="timeline-modal-meta"></p>
+    <h2 id="timeline-modal-title"></h2>
+    <p id="timeline-modal-summary"></p>
+    <a id="timeline-modal-link" class="btn btn-primary" href="#">Open Entry</a>
+  </article>
+</div>
+
+<script id="timeline-data" type="application/json" set:html={entriesJson}></script>
+<script>
+  import "../scripts/timeline-world.js";
+</script>

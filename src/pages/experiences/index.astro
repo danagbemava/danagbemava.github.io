@@ -1,0 +1,30 @@
+---
+import { getCollection } from "astro:content";
+import ExperiencesScene from "../../components/ExperiencesScene.astro";
+import AppLayout from "../../layouts/AppLayout.astro";
+import { stripMarkdown } from "../../lib/content-utils";
+
+const experiences = (await getCollection("experiences")).sort(
+  (a, b) => (a.data.order ?? Number.MAX_SAFE_INTEGER) - (b.data.order ?? Number.MAX_SAFE_INTEGER)
+);
+
+const entries = experiences.map((item) => ({
+  role: item.data.title,
+  company: item.data.company,
+  tenure: item.data.tenure,
+  summary: stripMarkdown(item.body || item.data.summary || ""),
+  activities: item.data.activities ?? []
+}));
+---
+
+<AppLayout
+  title="Experiences Gallery | Willows Bell"
+  description="Walk through role statues and inspect full experience details."
+  view="experiences"
+>
+  <ExperiencesScene
+    title="Experiences Gallery"
+    description="A guided hall of role statues. The avatar tours each role; interact with a statue to open full details and activities."
+    entries={entries}
+  />
+</AppLayout>

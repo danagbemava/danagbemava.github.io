@@ -1,0 +1,56 @@
+---
+layout: default
+---
+<link rel="stylesheet" href="{{ '/assets/css/immersive.css' | relative_url }}">
+
+<section class="immersive-page immersive-home">
+  <div class="immersive-stage">
+    <canvas id="home-canvas" aria-hidden="true"></canvas>
+    <div class="immersive-overlay" aria-hidden="true"></div>
+    <div class="home-hero">
+      <p class="home-kicker">Willows Bell</p>
+      <h1>Interactive journal of software, architecture, and production lessons.</h1>
+      <p>
+        I build backend and mobile systems, debug weird failures, and document what
+        actually works in real projects.
+      </p>
+      <div class="home-cta">
+        <a class="cta-primary" href="{{ '/projects.html' | relative_url }}">Walk Projects</a>
+        <a class="cta-secondary" href="{{ '/posts.html' | relative_url }}">Walk Posts</a>
+      </div>
+    </div>
+  </div>
+
+  <section class="home-columns">
+    <article class="home-card">
+      <div class="home-card-head">
+        <h2>Projects Timeline</h2>
+        <a href="{{ '/projects.html' | relative_url }}">Open 3D View</a>
+      </div>
+      <p>Move through an interactive corridor and open project doors to see details.</p>
+      <ul class="teaser-list">
+        {% for project in site.projects limit: 4 %}
+          <li><a href="{{ project.url | relative_url }}">{{ project.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </article>
+
+    <article class="home-card">
+      <div class="home-card-head">
+        <h2>Recent Writing</h2>
+        <a href="{{ '/posts.html' | relative_url }}">Open 3D View</a>
+      </div>
+      <p>Explore posts from a second timeline and jump into any article directly.</p>
+      <ul class="teaser-list">
+        {% for post in site.posts limit: 4 %}
+          <li>
+            <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+            <span>{{ post.date | date: "%b %-d, %Y" }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </article>
+  </section>
+</section>
+
+<script type="module" src="{{ '/assets/js/immersive-home.js' | relative_url }}"></script>

@@ -1,0 +1,70 @@
+---
+import { getCollection, render } from "astro:content";
+import AppLayout from "../../layouts/AppLayout.astro";
+import TechBadge from "../../components/TechBadge.astro";
+import { toTagString } from "../../lib/content-utils";
+
+export async function getStaticPaths() {
+  const projects = await getCollection("projects");
+  return projects.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry }
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const meta = toTagString(entry.data.stack) || "Project";
+const tech = entry.data.tech || [];
+const features = entry.data.features || [];
+const repo = entry.data.repo;
+const live = entry.data.live;
+---
+
+<AppLayout title={`${entry.data.title} | Project`} description={entry.data.description || meta}>
+  <section class="entry-page project-page">
+    <article class="entry-shell anim-fade-in">
+
+      <div class="project-hero anim-slide-up">
+        <p class="entry-meta">{meta}</p>
+        <h1>{entry.data.title}</h1>
+        {entry.data.description && <p class="project-desc">{entry.data.description}</p>}
+        {(repo || live) && (
+          <div class="project-links">
+            {repo && <a class="project-link" href={repo} target="_blank" rel="noopener">Repository ↗</a>}
+            {live && <a class="project-link project-link--live" href={live} target="_blank" rel="noopener">Live Demo ↗</a>}
+          </div>
+        )}
+      </div>
+
+      {tech.length > 0 && (
+        <div class="project-section anim-slide-up anim-delay-1">
+          <h2 class="section-heading">Tech Stack</h2>
+          <div class="tech-grid">
+            {tech.map((t, i) => (
+              <div class="anim-pop" style={`animation-delay: ${0.15 + i * 0.07}s`}>
+                <TechBadge name={t.name} icon={t.icon} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {features.length > 0 && (
+        <div class="project-section anim-slide-up anim-delay-2">
+          <h2 class="section-heading">Features</h2>
+          <ul class="feature-list">
+            {features.map((f, i) => (
+              <li class="anim-slide-right" style={`animation-delay: ${0.3 + i * 0.08}s`}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div class="project-section project-content anim-slide-up anim-delay-3">
+        <Content />
+      </div>
+
+    </article>
+  </section>
+</AppLayout>

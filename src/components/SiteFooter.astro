@@ -1,0 +1,48 @@
+---
+interface Props {
+  github?: string;
+  twitter?: string;
+  linkedin?: string;
+  email?: string;
+}
+
+const {
+  github = "#",
+  twitter = "#",
+  linkedin = "#",
+  email = "#"
+} = Astro.props;
+
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <p class="footer-logo">Willows Bell</p>
+      <p class="footer-tagline">An interactive software portfolio.</p>
+    </div>
+    <div class="footer-links">
+      <p class="footer-heading">Links</p>
+      <nav class="footer-nav">
+        <a href="/">Home</a>
+        <a href="/experiences/">Experiences</a>
+        <a href="/projects/">Projects</a>
+        <a href="/posts/">Posts</a>
+        <a href="/about/">About</a>
+      </nav>
+    </div>
+    <div class="footer-social">
+      <p class="footer-heading">Connect</p>
+      <nav class="footer-nav">
+        {github !== "#" && <a href={github} target="_blank" rel="noopener">GitHub</a>}
+        {twitter !== "#" && <a href={twitter} target="_blank" rel="noopener">Twitter / X</a>}
+        {linkedin !== "#" && <a href={linkedin} target="_blank" rel="noopener">LinkedIn</a>}
+        {email !== "#" && <a href={`mailto:${email}`}>Email</a>}
+      </nav>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>&copy; {year} Willows Bell. Built with Astro &amp; Three.js.</p>
+  </div>
+</footer>

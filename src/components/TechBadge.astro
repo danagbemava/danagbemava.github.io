@@ -1,0 +1,14 @@
+---
+interface Props {
+  name: string;
+  icon?: string;
+}
+
+const { name, icon } = Astro.props;
+const iconClass = icon ? `devicon-${icon}` : null;
+---
+
+<span class="tech-badge">
+  {iconClass && <i class={iconClass} aria-hidden="true"></i>}
+  <span>{name}</span>
+</span>

@@ -1,0 +1,32 @@
+---
+import { getCollection, render } from "astro:content";
+import AppLayout from "../../layouts/AppLayout.astro";
+import { formatDateLabel, toTagString } from "../../lib/content-utils";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("posts");
+  return posts.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry }
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const tagLabel = toTagString(entry.data.categories) || "Post";
+const dateLabel = formatDateLabel(entry.data.date);
+---
+
+<AppLayout title={`${entry.data.title} | Post`} description={`${dateLabel} - ${tagLabel}`}>
+  <section class="entry-page">
+    <article class="entry-shell anim-fade-in">
+      <div class="anim-slide-up">
+        <p class="entry-meta">{dateLabel} • {tagLabel}</p>
+        <h1>{entry.data.title}</h1>
+      </div>
+      <div class="post-content anim-slide-up anim-delay-1">
+        <Content />
+      </div>
+    </article>
+  </section>
+</AppLayout>

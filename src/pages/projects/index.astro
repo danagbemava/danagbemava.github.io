@@ -1,0 +1,31 @@
+---
+import { getCollection } from "astro:content";
+import HolodeckScene from "../../components/HolodeckScene.astro";
+import AppLayout from "../../layouts/AppLayout.astro";
+import { summarizeMarkdown, toTagString } from "../../lib/content-utils";
+
+const projects = (await getCollection("projects")).sort((a, b) =>
+  a.data.title.localeCompare(b.data.title)
+);
+
+const entries = projects.map((project) => ({
+  title: project.data.title,
+  url: `/projects/${project.slug}`,
+  dateLabel: project.data.timeline_year || "Project",
+  tags: toTagString(project.data.stack) || "Project Work",
+  summary: summarizeMarkdown(project.body || "")
+}));
+---
+
+<AppLayout
+  title="Projects Holodeck | Willows Bell"
+  description="Browse projects in an interactive 3D holodeck."
+  view="holodeck"
+>
+  <HolodeckScene
+    kind="projects"
+    title="Projects Holodeck"
+    description="Walk to the holodeck and tap it to browse projects. Select one to project its details."
+    entries={entries}
+  />
+</AppLayout>

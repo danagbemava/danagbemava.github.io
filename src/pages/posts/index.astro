@@ -1,0 +1,29 @@
+---
+import { getCollection } from "astro:content";
+import HolodeckScene from "../../components/HolodeckScene.astro";
+import AppLayout from "../../layouts/AppLayout.astro";
+import { formatDateLabel, sortByDateDesc, summarizeMarkdown, toTagString } from "../../lib/content-utils";
+
+const posts = sortByDateDesc(await getCollection("posts"));
+
+const entries = posts.map((post) => ({
+  title: post.data.title,
+  url: `/posts/${post.slug}`,
+  dateLabel: formatDateLabel(post.data.date),
+  tags: toTagString(post.data.categories) || "Post",
+  summary: summarizeMarkdown(post.body || "")
+}));
+---
+
+<AppLayout
+  title="Posts Holodeck | Willows Bell"
+  description="Browse posts in an interactive 3D holodeck."
+  view="holodeck"
+>
+  <HolodeckScene
+    kind="posts"
+    title="Posts Holodeck"
+    description="Walk to the holodeck and tap it to browse posts. Select one to project its details."
+    entries={entries}
+  />
+</AppLayout>

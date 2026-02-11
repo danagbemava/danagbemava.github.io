@@ -1,0 +1,138 @@
+---
+import { getCollection } from "astro:content";
+import AppLayout from "../layouts/AppLayout.astro";
+import { formatDateLabel, sortByDateDesc } from "../lib/content-utils";
+
+const posts = sortByDateDesc(await getCollection("posts")).slice(0, 4);
+const projects = (await getCollection("projects")).slice(0, 4);
+const totalPosts = (await getCollection("posts")).length;
+const totalProjects = (await getCollection("projects")).length;
+---
+
+<AppLayout title="Willows Bell" description="Interactive software portfolio with projects and posts.">
+  <section class="hero-page">
+    <section class="hero-stage">
+      <canvas id="home-canvas" aria-hidden="true"></canvas>
+      <div class="hero-shade"></div>
+      <article class="hero-copy">
+        <p class="kicker anim-slide-up">Immersive Portfolio</p>
+        <h1 class="hero-title">
+          <span class="hero-word anim-slide-up" style="animation-delay: 0.1s">Explore</span>
+          <span class="hero-word anim-slide-up" style="animation-delay: 0.18s">projects</span>
+          <span class="hero-word anim-slide-up" style="animation-delay: 0.26s">and</span>
+          <span class="hero-word anim-slide-up" style="animation-delay: 0.34s">posts</span>
+          <span class="hero-word anim-slide-up" style="animation-delay: 0.42s">in a</span>
+          <span class="hero-word hero-word--accent anim-slide-up" style="animation-delay: 0.5s">playable</span>
+          <span class="hero-word hero-word--accent anim-slide-up" style="animation-delay: 0.58s">holodeck.</span>
+        </h1>
+        <p class="anim-slide-up" style="animation-delay: 0.7s">
+          Built for interaction first. Step into a holodeck, browse entries,
+          and project details right inside the scene.
+        </p>
+        <div class="cta-row anim-slide-up" style="animation-delay: 0.85s">
+          <a class="btn btn-primary" href="/projects/">
+            <span class="btn-icon">🚀</span> Projects Holodeck
+          </a>
+          <a class="btn btn-secondary" href="/posts/">
+            <span class="btn-icon">📝</span> Posts Holodeck
+          </a>
+        </div>
+      </article>
+    </section>
+
+    <section class="stats-row anim-fade-in" style="animation-delay: 0.9s">
+      <div class="stat-card">
+        <span class="stat-number">{totalProjects}</span>
+        <span class="stat-label">Projects</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">{totalPosts}</span>
+        <span class="stat-label">Posts</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">3D</span>
+        <span class="stat-label">Interactive</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-number">∞</span>
+        <span class="stat-label">Curiosity</span>
+      </div>
+    </section>
+
+    <section class="home-features anim-fade-in" style="animation-delay: 1s">
+      <div class="feature-card">
+        <div class="feature-icon">🎮</div>
+        <h3>Holodeck Experience</h3>
+        <p>Tap the holodeck to browse entries. Pick one and watch it come alive as a holographic projection.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>Robot Companion</h3>
+        <p>Your animated robot avatar walks, runs, and idles alongside you through the scene.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔊</div>
+        <h3>Immersive Audio</h3>
+        <p>Sci-fi sound effects, ambient drones, and spatial audio that respond to your actions.</p>
+      </div>
+    </section>
+
+    <section class="card-grid">
+      <article class="card anim-slide-up" style="animation-delay: 0.15s">
+        <div class="card-head">
+          <h2>🚀 Projects</h2>
+          <a href="/projects/">Open Holodeck →</a>
+        </div>
+        <p>Browse projects in the holodeck.</p>
+        <ul class="list">
+          {projects.map((project, i) => (
+            <li class="anim-slide-right" style={`animation-delay: ${0.3 + i * 0.08}s`}>
+              <a href={`/projects/${project.slug}`}>{project.data.title}</a>
+              {project.data.description && <span class="list-desc">{project.data.description.slice(0, 60)}…</span>}
+            </li>
+          ))}
+        </ul>
+      </article>
+
+      <article class="card anim-slide-up" style="animation-delay: 0.25s">
+        <div class="card-head">
+          <h2>📝 Posts</h2>
+          <a href="/posts/">Open Holodeck →</a>
+        </div>
+        <p>Read posts projected in the holodeck.</p>
+        <ul class="list">
+          {posts.map((post, i) => (
+            <li class="anim-slide-right" style={`animation-delay: ${0.4 + i * 0.08}s`}>
+              <a href={`/posts/${post.slug}`}>{post.data.title}</a>
+              <span>{formatDateLabel(post.data.date)}</span>
+            </li>
+          ))}
+        </ul>
+      </article>
+    </section>
+
+    <section class="about-preview anim-fade-in" style="animation-delay: 0.5s">
+      <div class="about-preview-avatar">
+        <div class="about-avatar-ring">
+          <span class="about-avatar-emoji">🤖</span>
+        </div>
+      </div>
+      <div class="about-preview-text">
+        <p class="kicker">About Me</p>
+        <h2>Software engineer who builds things that matter.</h2>
+        <p>
+          I care about clean architecture, thoughtful UX, and shipping software that
+          makes a difference. This portfolio is itself an experiment — an interactive 3D
+          holodeck built with Three.js and Astro.
+        </p>
+        <a class="btn btn-secondary" href="/about/" style="margin-top: 1rem; display: inline-flex;">
+          Learn More →
+        </a>
+      </div>
+    </section>
+  </section>
+
+  <script>
+    import "../scripts/immersive-home.js";
+  </script>
+</AppLayout>

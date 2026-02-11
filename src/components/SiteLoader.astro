@@ -1,0 +1,22 @@
+---
+---
+
+<div id="site-loader" class="site-loader" aria-hidden="true">
+  <div class="loader-content">
+    <div class="loader-ring"></div>
+    <p class="loader-text">Willows Bell</p>
+    <p class="loader-sub">Loading experience…</p>
+  </div>
+</div>
+
+<script>
+  const loader = document.getElementById("site-loader");
+  if (loader) {
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        loader.classList.add("loader-done");
+        setTimeout(() => loader.remove(), 600);
+      }, 400);
+    });
+  }
+</script>

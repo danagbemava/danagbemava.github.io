@@ -1,0 +1,64 @@
+---
+layout: default
+---
+<link rel="stylesheet" href="{{ '/assets/css/immersive.css' | relative_url }}">
+
+{% assign timeline_kind = page.timeline_kind | default: "projects" %}
+{% if timeline_kind == "projects" %}
+  {% assign timeline_items = site.projects %}
+{% else %}
+  {% assign timeline_items = site.posts | sort: "date" | reverse %}
+{% endif %}
+
+<section class="immersive-page timeline-page" data-kind="{{ timeline_kind }}">
+  <header class="timeline-intro">
+    <p class="home-kicker">{{ timeline_kind | capitalize }} Timeline</p>
+    <h1>{{ page.title }}</h1>
+    <p>{{ page.description }}</p>
+    <p class="timeline-help">Controls: `WASD`/Arrow keys to move, `E` or click to open a door.</p>
+  </header>
+
+  <div class="timeline-stage-wrapper">
+    <canvas id="timeline-canvas" data-kind="{{ timeline_kind }}" aria-label="{{ page.title }} timeline scene"></canvas>
+    <div class="timeline-hud">
+      <p id="timeline-status">Loading timeline scene...</p>
+      <p id="timeline-prompt"></p>
+    </div>
+  </div>
+
+  <noscript>
+    <section class="timeline-noscript">
+      <h2>Timeline Entries</h2>
+      <ul class="teaser-list">
+        {% for item in timeline_items %}
+          <li><a href="{{ item.url | relative_url }}">{{ item.title }}</a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  </noscript>
+</section>
+
+<div class="timeline-modal" id="timeline-modal" hidden aria-hidden="true">
+  <article class="timeline-modal-card" aria-modal="true" role="dialog" aria-labelledby="timeline-modal-title">
+    <button id="timeline-modal-close" class="timeline-modal-close" type="button" aria-label="Close details">Close</button>
+    <p id="timeline-modal-meta" class="timeline-modal-meta"></p>
+    <h2 id="timeline-modal-title"></h2>
+    <p id="timeline-modal-summary"></p>
+    <a id="timeline-modal-link" class="cta-primary" href="#">Open Entry</a>
+  </article>
+</div>
+
+<script id="timeline-data" type="application/json">
+[
+{% for item in timeline_items %}
+  {
+    "title": {{ item.title | jsonify }},
+    "url": {{ item.url | relative_url | jsonify }},
+    "dateLabel": {% if timeline_kind == "projects" %}{{ item.timeline_year | default: "Project" | jsonify }}{% else %}{{ item.date | date: "%b %-d, %Y" | jsonify }}{% endif %},
+    "tags": {% if timeline_kind == "projects" %}{{ item.stack | default: "Project Work" | jsonify }}{% else %}{% if item.categories and item.categories != empty %}{{ item.categories | join: ", " | jsonify }}{% else %}{{ "Post" | jsonify }}{% endif %}{% endif %},
+    "summary": {{ item.excerpt | default: item.content | strip_html | strip_newlines | replace: "  ", " " | strip | truncate: 220 | jsonify }}
+  }{% unless forloop.last %},{% endunless %}
+{% endfor %}
+]
+</script>
+<script type="module" src="{{ '/assets/js/timeline-world.js' | relative_url }}"></script>

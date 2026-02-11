@@ -1,0 +1,85 @@
+---
+interface HolodeckEntry {
+  title: string;
+  url: string;
+  dateLabel: string;
+  tags: string;
+  summary: string;
+}
+
+interface Props {
+  kind: "projects" | "posts";
+  title: string;
+  description: string;
+  entries: HolodeckEntry[];
+}
+
+const { kind, title, description, entries } = Astro.props;
+const entriesJson = JSON.stringify(entries).replace(/<\/script/gi, "<\\/script");
+---
+
+<section class="holodeck-shell" data-kind={kind}>
+  <canvas id="holodeck-canvas" class="holodeck-canvas" data-kind={kind} aria-label={`${title} holodeck scene`}></canvas>
+
+  <aside class="holodeck-ui" id="holodeck-ui">
+    <p class="kicker">{kind === "posts" ? "Posts Holodeck" : "Projects Holodeck"}</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    <p class="holodeck-help">Approach the holotable and press <kbd>E</kbd> or click it to browse entries.</p>
+  </aside>
+
+  <div class="holodeck-hud">
+    <p class="holodeck-chip" id="holodeck-status">Loading holodeck...</p>
+    <p class="holodeck-chip" id="holodeck-prompt"></p>
+    <button class="holodeck-chip holodeck-mute-btn" id="holodeck-mute" type="button" aria-label="Toggle sound">🔊 Sound</button>
+  </div>
+
+  <noscript>
+    <div class="holodeck-ui">
+      <h2>Entries</h2>
+      <ul class="list">
+        {entries.map((entry) => (
+          <li>
+            <a href={entry.url}>{entry.title}</a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </noscript>
+</section>
+
+<!-- List modal: pick an entry -->
+<div class="holodeck-list-modal" id="holodeck-list-modal" hidden aria-hidden="true">
+  <article class="holodeck-list-card" role="dialog" aria-modal="true" aria-label="Choose an entry">
+    <div class="holodeck-list-header">
+      <h2>Choose {kind === "posts" ? "a Post" : "a Project"}</h2>
+      <button id="holodeck-list-close" class="holodeck-modal-close" type="button" aria-label="Close list">✕</button>
+    </div>
+    <ul class="holodeck-entry-list" id="holodeck-entry-list">
+      {entries.map((entry, i) => (
+        <li>
+          <button class="holodeck-entry-btn" data-index={i} type="button">
+            <span class="holodeck-entry-title">{entry.title}</span>
+            <span class="holodeck-entry-meta">{entry.dateLabel} · {entry.tags}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </article>
+</div>
+
+<!-- Detail panel: shown inside holodeck projection -->
+<div class="holodeck-detail" id="holodeck-detail" hidden aria-hidden="true">
+  <article class="holodeck-detail-card">
+    <button id="holodeck-detail-close" class="holodeck-modal-close" type="button" aria-label="Close details">✕ Close</button>
+    <p id="holodeck-detail-meta" class="holodeck-modal-meta"></p>
+    <h2 id="holodeck-detail-title"></h2>
+    <p id="holodeck-detail-summary"></p>
+    <a id="holodeck-detail-link" class="btn btn-primary" href="#">{kind === "posts" ? "Read Post" : "Open Project"}</a>
+  </article>
+</div>
+
+<script id="holodeck-data" type="application/json" set:html={entriesJson}></script>
+<script>
+  import "../scripts/holodeck-world.js";
+</script>

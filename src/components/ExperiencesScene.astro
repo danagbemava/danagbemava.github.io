@@ -1,0 +1,63 @@
+---
+interface ExperienceEntry {
+  role: string;
+  company: string;
+  tenure: string;
+  summary: string;
+  activities: string[];
+}
+
+interface Props {
+  title: string;
+  description: string;
+  entries: ExperienceEntry[];
+}
+
+const { title, description, entries } = Astro.props;
+const entriesJson = JSON.stringify(entries).replace(/<\/script/gi, "<\\/script");
+---
+
+<section class="experiences-shell">
+  <canvas id="experiences-canvas" class="experiences-canvas" aria-label={`${title} experiences scene`}></canvas>
+
+  <aside class="experiences-ui" id="experiences-ui">
+    <p class="kicker">Experiences Gallery</p>
+    <h1>{title}</h1>
+    <p>{description}</p>
+    <p class="experiences-help">Use WASD / arrows to move. Press <kbd>E</kbd> or click a statue to inspect it.</p>
+  </aside>
+
+  <div class="experiences-hud">
+    <p class="experiences-chip" id="experiences-status">Loading experiences world...</p>
+    <p class="experiences-chip" id="experiences-prompt"></p>
+    <button class="experiences-chip experiences-tour-btn" id="experiences-tour-toggle" type="button">Pause Tour</button>
+    <button class="experiences-chip experiences-mute-btn" id="experiences-mute" type="button" aria-label="Toggle sound">🔊 Sound</button>
+  </div>
+
+  <noscript>
+    <div class="experiences-ui">
+      <h2>Experience</h2>
+      <ul class="list">
+        {entries.map((entry) => (
+          <li>{entry.role} at {entry.company} <span>({entry.tenure})</span></li>
+        ))}
+      </ul>
+    </div>
+  </noscript>
+</section>
+
+<div class="experiences-modal" id="experiences-modal" hidden aria-hidden="true">
+  <article class="experiences-modal-card" role="dialog" aria-modal="true" aria-labelledby="experiences-modal-title">
+    <button id="experiences-modal-close" class="experiences-modal-close" type="button" aria-label="Close details">Close</button>
+    <p id="experiences-modal-meta" class="experiences-modal-meta"></p>
+    <h2 id="experiences-modal-title"></h2>
+    <p id="experiences-modal-summary"></p>
+    <h3>Activities</h3>
+    <ul id="experiences-modal-activities" class="experiences-activity-list"></ul>
+  </article>
+</div>
+
+<script id="experiences-data" type="application/json" set:html={entriesJson}></script>
+<script>
+  import "../scripts/experiences-world.js";
+</script>
