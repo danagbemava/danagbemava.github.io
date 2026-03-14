@@ -1,29 +1,50 @@
 ---
-import { getCollection } from "astro:content";
-import HolodeckScene from "../../components/HolodeckScene.astro";
-import AppLayout from "../../layouts/AppLayout.astro";
-import { formatDateLabel, sortByDateDesc, summarizeMarkdown, toTagString } from "../../lib/content-utils";
+import { getCollection } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+import {
+  sortByDateDesc,
+  formatDateLabel,
+  toTagString,
+  summarizeMarkdown,
+  isComplete,
+} from '../../lib/content-utils';
 
-const posts = sortByDateDesc(await getCollection("posts"));
-
-const entries = posts.map((post) => ({
-  title: post.data.title,
-  url: `/posts/${post.slug}`,
-  dateLabel: formatDateLabel(post.data.date),
-  tags: toTagString(post.data.categories) || "Post",
-  summary: summarizeMarkdown(post.body || "")
-}));
+const posts = sortByDateDesc((await getCollection('posts')).filter(isComplete));
 ---
 
 <AppLayout
-  title="Posts Holodeck | Willows Bell"
-  description="Browse posts in an interactive 3D holodeck."
-  view="holodeck"
+  title="Posts | Willows Bell"
+  description="Archive of technical posts and debugging stories."
 >
-  <HolodeckScene
-    kind="posts"
-    title="Posts Holodeck"
-    description="Walk to the holodeck and tap it to browse posts. Select one to project its details."
-    entries={entries}
-  />
+  <section class="listing-page">
+    <header class="listing-header anim-fade-in">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>ARCHIVE // ALL_LOGS</span>
+      </div>
+      <h1>Posts</h1>
+      <p class="listing-subtitle">
+        Technical writing, debugging stories, and engineering notes.
+      </p>
+    </header>
+
+    <div class="listing-grid anim-slide-up">
+      {
+        posts.map((post) => (
+          <a class="listing-card holo-panel" href={`/posts/${post.slug}/`}>
+            <div class="listing-card-header">
+              <span class="listing-card-date">
+                {formatDateLabel(post.data.date)}
+              </span>
+              <span class="listing-card-tag">
+                {toTagString(post.data.categories) || 'Post'}
+              </span>
+            </div>
+            <h2>{post.data.title}</h2>
+            <p>{summarizeMarkdown(post.body || '', 180)}</p>
+          </a>
+        ))
+      }
+    </div>
+  </section>
 </AppLayout>

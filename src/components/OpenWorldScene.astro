@@ -1,0 +1,141 @@
+---
+import VirtualJoystick from './VirtualJoystick.astro';
+
+interface Props {
+  projects: any[];
+  posts: any[];
+  experiences?: any[];
+  startZone?: 'home' | 'projects' | 'posts' | 'experiences';
+}
+
+const { projects, posts, experiences = [], startZone = 'home' } = Astro.props;
+const projectsJson = JSON.stringify(projects).replace(/<\/script/gi, '<\\/script');
+const postsJson = JSON.stringify(posts).replace(/<\/script/gi, '<\\/script');
+const experiencesJson = JSON.stringify(experiences).replace(/<\/script/gi, '<\\/script');
+---
+
+<section class="open-world-shell" id="open-world-shell" data-start-zone={startZone}>
+  <!-- Loading overlay -->
+  <div class="world-loading" id="world-loading">
+    <div class="world-loading-inner">
+      <div class="world-loading-spinner"></div>
+      <p class="world-loading-text">Initializing world&hellip;</p>
+      <p class="world-loading-hint" id="world-loading-hint">Loading terrain</p>
+    </div>
+  </div>
+
+  <!-- First-visit tutorial overlay -->
+  <div class="world-tutorial" id="world-tutorial" hidden aria-hidden="true">
+    <div class="world-tutorial-hints">
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">WASD</span>
+        <span class="tutorial-label">Move around</span>
+      </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">E</span>
+        <span class="tutorial-label">Inspect nearby nodes</span>
+      </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">Click</span>
+        <span class="tutorial-label">Click ground to walk there</span>
+      </div>
+    </div>
+    <p class="world-tutorial-dismiss">Press any key or tap to begin</p>
+  </div>
+
+  <!-- Secret discovery reward banner -->
+  <div class="world-secret-reward" id="world-secret-reward" hidden aria-hidden="true">
+    <div class="world-secret-reward-inner">
+      <p class="world-secret-reward-title" id="world-secret-reward-title">Secret Discovered</p>
+      <p class="world-secret-reward-text" id="world-secret-reward-text"></p>
+    </div>
+  </div>
+
+  <!-- Zone transition flash -->
+  <div class="world-zone-flash" id="world-zone-flash" aria-hidden="true"></div>
+
+  <canvas id="open-world-canvas" class="open-world-canvas" aria-label="Open World Portfolio"></canvas>
+
+  <div class="open-world-ui" id="open-world-ui">
+    <!-- Top-left: compact zone info -->
+    <div class="hud-top-left">
+      <div class="hud-header">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span class="kicker" id="world-zone-label">Sector: HUB</span>
+        </div>
+        <span class="hud-sprint-badge" id="world-sprint-badge" hidden>SPRINT</span>
+      </div>
+      <p class="hud-zone-blurb" id="world-zone-blurb">Central command district.</p>
+      <p class="hud-objective" id="world-objective">Explore districts and activate each landmark beacon.</p>
+      <div class="hud-stats-row">
+        <span class="hud-stat" id="world-energy"><span class="hud-stat-icon">&#9889;</span> <span id="world-energy-val">62%</span></span>
+        <span class="hud-stat" id="world-secrets"><span class="hud-stat-icon">&#9670;</span> <span id="world-secrets-val">0</span></span>
+        <span class="hud-stat" id="world-visits"><span class="hud-stat-icon">&#9737;</span> <span id="world-visits-val">0</span></span>
+      </div>
+      <div class="hud-toggles">
+        <button class="hud-btn hud-btn-ghost" id="world-camera-mode" type="button">Cam: Isometric</button>
+        <button class="hud-btn hud-btn-ghost" id="world-quality-mode" type="button">Quality: Auto</button>
+        <button class="hud-btn hud-btn-ghost hud-btn-help-toggle" id="world-help-toggle" type="button">?</button>
+      </div>
+      <div class="hud-help-panel" id="world-help-panel" hidden>
+        <p class="hud-help">WASD / Arrows &middot; Click Ground to Move &middot; E to Inspect</p>
+        <p class="hud-help hud-help-sub">Shift to Sprint &middot; Space to Jump</p>
+        <p class="hud-help hud-help-sub">Districts: Projects (West) &middot; Posts (East) &middot; Experiences (North)</p>
+      </div>
+    </div>
+
+    <!-- Top-right: minimap compass -->
+    <div class="hud-top-right">
+      <canvas id="world-minimap" class="world-minimap" width="140" height="140" aria-label="Minimap"></canvas>
+    </div>
+
+    <!-- Bottom section -->
+    <div class="hud-bottom">
+      <div class="hud-bottom-left">
+        <!-- Interaction prompt (centered-ish on mobile, bottom-left on desktop) -->
+        <div class="world-interaction-prompt" id="world-prompt" hidden>
+          <span class="prompt-key">E</span>
+          <span class="prompt-text" id="world-prompt-text">Inspect</span>
+        </div>
+      </div>
+      <div class="hud-bottom-right">
+        <button class="hud-btn hud-action-btn" id="world-action" type="button" disabled>Inspect</button>
+        <button class="hud-btn" id="world-mute" type="button" aria-label="Toggle sound">Sound</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick look panel -->
+  <aside class="world-quicklook" id="world-quicklook" hidden aria-hidden="true">
+    <div class="world-quicklook-head">
+      <p class="world-quicklook-kicker" id="world-quicklook-kicker">PROJECT</p>
+      <h3 class="world-quicklook-title" id="world-quicklook-title">Quick Look</h3>
+    </div>
+    <canvas class="world-quicklook-canvas" id="world-quicklook-canvas" width="320" height="200"></canvas>
+    <p class="world-quicklook-summary" id="world-quicklook-summary">Approach a node to preview it.</p>
+  </aside>
+
+  <!-- Detail modal -->
+  <div class="world-detail" id="world-detail" hidden aria-hidden="true">
+    <article class="world-detail-card" role="dialog" aria-modal="true" aria-labelledby="world-detail-title">
+      <button id="world-detail-close" class="world-modal-close" type="button" aria-label="Close details">&times; Close</button>
+      <p id="world-detail-meta" class="world-modal-meta"></p>
+      <h2 id="world-detail-title"></h2>
+      <p id="world-detail-summary"></p>
+      <div class="world-detail-actions">
+        <a id="world-detail-link" class="btn btn-primary" href="#">Open</a>
+      </div>
+    </article>
+  </div>
+
+  <script id="world-data-projects" type="application/json" set:html={projectsJson} />
+  <script id="world-data-posts" type="application/json" set:html={postsJson} />
+  <script id="world-data-experiences" type="application/json" set:html={experiencesJson} />
+
+  <script>
+    import '../scripts/open-world.js';
+  </script>
+
+  <VirtualJoystick />
+</section>

@@ -1,10 +1,24 @@
 import * as THREE from "three";
+import { getWorldSnapshot, registerVisit, markInteraction } from "./world-state.js";
+import { startWorldEvents } from "./world-events.js";
+
+let homeAnimationFrameId = null;
 
 const startHomeScene = () => {
+  if (homeAnimationFrameId) {
+    cancelAnimationFrame(homeAnimationFrameId);
+    homeAnimationFrameId = null;
+  }
+
   const canvas = document.getElementById("home-canvas");
   if (!canvas) {
     return;
   }
+  const featuredNodeEl = document.getElementById("world-featured-node");
+  const bulletinEl = document.getElementById("world-bulletin");
+  const historyEl = document.getElementById("world-history");
+  const visitSnapshot = registerVisit("home");
+  let worldSnapshot = getWorldSnapshot("home");
 
   let renderer;
   try {
@@ -15,18 +29,29 @@ const startHomeScene = () => {
   }
 
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.1;
+  renderer.toneMappingExposure = 1.05;
+
+  const phaseProfile = (phase) => {
+    if (phase === "dawn") return { ambient: 0.68, warm: 0.74, cool: 0.58, exposure: 1.06, drift: 1.08 };
+    if (phase === "day") return { ambient: 0.75, warm: 0.8, cool: 0.6, exposure: 1.1, drift: 1.12 };
+    if (phase === "dusk") return { ambient: 0.56, warm: 0.72, cool: 0.52, exposure: 1.0, drift: 0.94 };
+    return { ambient: 0.44, warm: 0.55, cool: 0.45, exposure: 0.9, drift: 0.8 };
+  };
+  let worldProfile = phaseProfile(worldSnapshot.dayPhase);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(56, 1, 0.1, 220);
   camera.position.set(0, 1.9, 14.5);
 
-  scene.add(new THREE.AmbientLight(0x0a1525, 0.6));
+  const ambient = new THREE.AmbientLight(0x0a1525, worldProfile.ambient);
+  scene.add(ambient);
   const warm = new THREE.DirectionalLight(0x8ec8f8, 0.7);
   warm.position.set(4, 9, 8);
+  warm.intensity = worldProfile.warm;
   scene.add(warm);
   const cool = new THREE.DirectionalLight(0x4fc3f7, 0.5);
   cool.position.set(-6, 5, -5);
+  cool.intensity = worldProfile.cool;
   scene.add(cool);
 
   // ── Orbital rings ──
@@ -161,6 +186,33 @@ const startHomeScene = () => {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const clock = new THREE.Clock();
   let elapsed = 0;
+  let snapshotRefresh = 0;
+
+  const updateWorldPulseText = (snapshot) => {
+    if (featuredNodeEl) {
+      featuredNodeEl.textContent = `Featured Node: ${snapshot.featuredNode}`;
+    }
+    if (bulletinEl) {
+      bulletinEl.textContent = `System bulletin: ${snapshot.bulletin}`;
+    }
+    if (historyEl) {
+      historyEl.textContent = `Last zone: ${snapshot.lastVisitedLabel} (${snapshot.lastVisitAgo}) · Secrets: ${snapshot.secretsFound} · Visits: ${snapshot.totalVisits}`;
+    }
+  };
+  updateWorldPulseText(visitSnapshot);
+
+  const stopWorldEvents = startWorldEvents({
+    zone: "home",
+    sound: false,
+    minDelayMs: 16000,
+    maxDelayMs: 28000,
+    onEvent: (event) => {
+      if (bulletinEl) {
+        bulletinEl.textContent = `System bulletin: ${event.text}`;
+      }
+      markInteraction(0.25);
+    }
+  });
 
   const onResize = () => {
     const width = canvas.clientWidth || canvas.parentElement?.clientWidth || window.innerWidth;
@@ -178,6 +230,7 @@ const startHomeScene = () => {
     }
     pointerTarget.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointerTarget.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+    markInteraction(0.04);
   };
 
   canvas.addEventListener("pointermove", onPointerMove);
@@ -192,16 +245,24 @@ const startHomeScene = () => {
   const tick = () => {
     const delta = clock.getDelta();
     elapsed += delta;
+    snapshotRefresh += delta;
+
+    if (snapshotRefresh > 12) {
+      snapshotRefresh = 0;
+      worldSnapshot = getWorldSnapshot("home");
+      worldProfile = phaseProfile(worldSnapshot.dayPhase);
+      updateWorldPulseText(worldSnapshot);
+    }
 
     if (!reducedMotion) {
       pointerCurrent.lerp(pointerTarget, Math.min(1, delta * 2.5));
-      ringGroup.rotation.y += delta * 0.12;
+      ringGroup.rotation.y += delta * (0.1 + worldSnapshot.energyLevel * 0.12);
       ringGroup.rotation.z = Math.sin(elapsed * 0.25) * 0.08;
       ringGroup.position.y = Math.sin(elapsed * 0.7) * 0.25;
       core.rotation.x += delta * 0.25;
       core.rotation.y -= delta * 0.32;
       core.position.y = 0.2 + Math.sin(elapsed * 1.4) * 0.2;
-      coreGlow.intensity = 1.2 + Math.sin(elapsed * 2) * 0.4;
+      coreGlow.intensity = 1.0 + worldSnapshot.energyLevel * 0.9 + Math.sin(elapsed * 2) * 0.35;
       particles.rotation.y = elapsed * 0.03;
       particles.position.y = Math.cos(elapsed * 0.8) * 0.12;
       dust.rotation.y = -elapsed * 0.02;
@@ -209,7 +270,7 @@ const startHomeScene = () => {
       // Animate particles drift
       const posArr = particleGeometry.attributes.position.array;
       for (let i = 0; i < particleCount; i++) {
-        posArr[i * 3 + 1] += Math.sin(elapsed * pSpeeds[i] + i) * delta * 0.08;
+        posArr[i * 3 + 1] += Math.sin(elapsed * pSpeeds[i] + i) * delta * 0.08 * worldProfile.drift;
       }
       particleGeometry.attributes.position.needsUpdate = true;
 
@@ -224,15 +285,31 @@ const startHomeScene = () => {
       }
     }
 
+    ambient.intensity += (worldProfile.ambient - ambient.intensity) * Math.min(1, delta * 1.6);
+    warm.intensity += (worldProfile.warm - warm.intensity) * Math.min(1, delta * 1.6);
+    cool.intensity += (worldProfile.cool - cool.intensity) * Math.min(1, delta * 1.6);
+    renderer.toneMappingExposure += (worldProfile.exposure - renderer.toneMappingExposure) * Math.min(1, delta * 1.2);
+
     camera.position.x += ((pointerCurrent.x * 1.3) - camera.position.x) * 0.04;
     camera.position.y += ((1.85 + pointerCurrent.y * 0.42) - camera.position.y) * 0.04;
     camera.lookAt(0, 0.6, -3.1);
 
     renderer.render(scene, camera);
-    requestAnimationFrame(tick);
+
+    if (elapsed < 0.1) {
+      window.dispatchEvent(new CustomEvent('scene-ready'));
+    }
+
+    homeAnimationFrameId = requestAnimationFrame(tick);
   };
+
+  document.addEventListener("astro:before-preparation", () => {
+    cancelAnimationFrame(homeAnimationFrameId);
+    stopWorldEvents();
+    renderer.dispose();
+  }, { once: true });
 
   tick();
 };
 
-startHomeScene();
+document.addEventListener("astro:page-load", startHomeScene);

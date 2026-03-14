@@ -1,30 +1,94 @@
 ---
-import { getCollection } from "astro:content";
-import ExperiencesScene from "../../components/ExperiencesScene.astro";
-import AppLayout from "../../layouts/AppLayout.astro";
-import { stripMarkdown } from "../../lib/content-utils";
+import { getCollection } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { stripMarkdown } from '../../lib/content-utils';
 
-const experiences = (await getCollection("experiences")).sort(
-  (a, b) => (a.data.order ?? Number.MAX_SAFE_INTEGER) - (b.data.order ?? Number.MAX_SAFE_INTEGER)
+const experiences = await getCollection('experiences');
+// Sort by order if available, otherwise keep collection order
+const sorted = [...experiences].sort(
+  (a, b) => (a.data.order ?? 99) - (b.data.order ?? 99),
 );
-
-const entries = experiences.map((item) => ({
-  role: item.data.title,
-  company: item.data.company,
-  tenure: item.data.tenure,
-  summary: stripMarkdown(item.body || item.data.summary || ""),
-  activities: item.data.activities ?? []
-}));
 ---
 
 <AppLayout
-  title="Experiences Gallery | Willows Bell"
-  description="Walk through role statues and inspect full experience details."
-  view="experiences"
+  title="Experiences | Willows Bell"
+  description="Professional timeline and work history."
 >
-  <ExperiencesScene
-    title="Experiences Gallery"
-    description="A guided hall of role statues. The avatar tours each role; interact with a statue to open full details and activities."
-    entries={entries}
-  />
+  <section class="listing-page">
+    <header class="listing-header anim-fade-in">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>PERSONNEL_FILE // SERVICE_RECORD</span>
+      </div>
+      <h1>Experiences</h1>
+      <p class="listing-subtitle">Professional journey and roles.</p>
+    </header>
+
+    <div class="experience-timeline anim-slide-up">
+      {
+        sorted.map((exp, i) => (
+          <div
+            class="experience-card holo-panel"
+            style={`animation-delay: ${i * 0.1}s`}
+          >
+            <div class="experience-card-accent" />
+            <div class="experience-card-body">
+              <div class="experience-card-header">
+                <h2>{exp.data.title}</h2>
+                <span class="experience-tenure">{exp.data.tenure}</span>
+              </div>
+              <p class="experience-company">{exp.data.company}</p>
+              {exp.data.activities && exp.data.activities.length > 0 && (
+                <ul class="experience-activities">
+                  {exp.data.activities.map((a) => (
+                    <li>{a}</li>
+                  ))}
+                </ul>
+              )}
+              {exp.data.clients && exp.data.clients.length > 0 && (
+                <div class="experience-clients">
+                  <h3>Clients & Projects</h3>
+                  {exp.data.clients.map((client) => (
+                    <div class="client-group">
+                      <h4 class="client-name">{client.name}</h4>
+                      {client.projects && client.projects.length > 0 && (
+                        <div class="client-projects">
+                          {client.projects.map((project) => (
+                            <div class="project-item">
+                              {project.link ? (
+                                <a
+                                  href={project.link}
+                                  class="project-name project-link"
+                                >
+                                  {project.name}
+                                </a>
+                              ) : (
+                                <span class="project-name">{project.name}</span>
+                              )}
+                              {project.tools && project.tools.length > 0 && (
+                                <div class="project-tools">
+                                  {project.tools.map((tool) => (
+                                    <span class="tech-badge">{tool}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(exp.body || exp.data.summary) && (
+                <p class="experience-summary">
+                  {exp.body ? stripMarkdown(exp.body) : exp.data.summary}
+                </p>
+              )}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </section>
 </AppLayout>

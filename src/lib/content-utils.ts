@@ -10,6 +10,9 @@ export const toTagString = (value?: string | string[]) => {
   return value;
 };
 
+export const isComplete = <T extends { data: { status?: "complete" | "incomplete" } }>(entry: T) =>
+  (entry.data.status ?? "complete") === "complete";
+
 export const sortByDateDesc = <T extends { data: { date?: Date } }>(items: T[]) =>
   [...items].sort((a, b) => {
     const aTime = a.data.date ? new Date(a.data.date).getTime() : 0;

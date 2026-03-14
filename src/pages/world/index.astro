@@ -1,0 +1,44 @@
+---
+import { getCollection } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+import OpenWorldScene from '../../components/OpenWorldScene.astro';
+import { sortByDateDesc, stripMarkdown, isComplete } from '../../lib/content-utils';
+
+const posts = sortByDateDesc((await getCollection('posts')).filter(isComplete));
+const projects = (await getCollection('projects')).filter(isComplete);
+const experiences = await getCollection('experiences');
+
+const projectEntries = projects.map((item) => ({
+    slug: item.id.replace(/\.md$/, ''),
+    title: item.data.title,
+    description:
+        item.data.description || stripMarkdown(item.body || '').slice(0, 200),
+}));
+
+const postEntries = posts.map((item) => ({
+    slug: item.id.replace(/\.md$/, ''),
+    title: item.data.title,
+    excerpt:
+        item.data.description || stripMarkdown(item.body || '').slice(0, 200),
+}));
+
+const experienceEntries = experiences.map((item) => ({
+    title: item.data.title,
+    company: item.data.company,
+    tenure: item.data.tenure,
+    summary: stripMarkdown(item.body || item.data.summary || ''),
+}));
+---
+
+<AppLayout
+    title="Interactive World | Willows Bell"
+    description="Immersive open world software portfolio."
+    view="openworld"
+>
+    <OpenWorldScene
+        projects={projectEntries}
+        posts={postEntries}
+        experiences={experienceEntries}
+        startZone="home"
+    />
+</AppLayout>

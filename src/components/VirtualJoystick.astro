@@ -1,0 +1,165 @@
+---
+---
+
+<div id="joystick-zone" class="joystick-zone" aria-hidden="true">
+  <div class="joystick-base">
+    <div class="joystick-sprint-ring"></div>
+    <div id="joystick-stick" class="joystick-stick"></div>
+  </div>
+</div>
+
+<style>
+  .joystick-zone {
+    position: fixed;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    left: max(1rem, env(safe-area-inset-left));
+    width: 148px;
+    height: 148px;
+    z-index: 100;
+    display: none;
+    touch-action: none;
+    user-select: none;
+  }
+
+  @media (pointer: coarse) {
+    .joystick-zone {
+      display: block;
+    }
+  }
+
+  .joystick-base {
+    width: 100%;
+    height: 100%;
+    background: rgba(20, 40, 60, 0.18);
+    border: 2px solid rgba(79, 195, 247, 0.2);
+    border-radius: 50%;
+    position: relative;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .joystick-base.is-active {
+    border-color: rgba(79, 195, 247, 0.45);
+    background: rgba(20, 40, 60, 0.28);
+  }
+
+  .joystick-sprint-ring {
+    position: absolute;
+    inset: 14px;
+    border: 1.5px dashed rgba(79, 195, 247, 0.12);
+    border-radius: 50%;
+    pointer-events: none;
+    transition: border-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .joystick-base.is-sprinting .joystick-sprint-ring {
+    border-color: rgba(79, 195, 247, 0.5);
+    opacity: 1;
+  }
+
+  .joystick-stick {
+    width: 54px;
+    height: 54px;
+    background: var(--accent-cyan, #29b6f6);
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 16px rgba(41, 182, 246, 0.35);
+    pointer-events: none;
+    transition: box-shadow 0.15s ease, width 0.1s ease, height 0.1s ease;
+    will-change: transform;
+  }
+
+  .joystick-base.is-active .joystick-stick {
+    box-shadow: 0 0 24px rgba(41, 182, 246, 0.55);
+  }
+
+  .joystick-base.is-sprinting .joystick-stick {
+    width: 50px;
+    height: 50px;
+    box-shadow: 0 0 30px rgba(41, 182, 246, 0.7);
+  }
+</style>
+
+<script>
+  const zone = document.getElementById('joystick-zone');
+  const stick = document.getElementById('joystick-stick');
+
+  if (zone && stick) {
+    const base = zone.querySelector('.joystick-base');
+    let active = false;
+    let startPos = { x: 0, y: 0 };
+    const maxRadius = 50;
+    const sprintThreshold = 0.82;
+    const deadZone = 0.08;
+
+    const emit = (x, y) => {
+      window.dispatchEvent(new CustomEvent('joystick-move', { detail: { x, y } }));
+    };
+
+    const emitSprint = (sprinting) => {
+      window.dispatchEvent(new CustomEvent('joystick-sprint', { detail: { sprinting } }));
+    };
+
+    let wasSprinting = false;
+
+    zone.addEventListener('touchstart', (e) => {
+      active = true;
+      const rect = zone.getBoundingClientRect();
+      startPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      if (base) base.classList.add('is-active');
+      e.preventDefault();
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!active) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - startPos.x;
+      const dy = touch.clientY - startPos.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const angle = Math.atan2(dy, dx);
+
+      const limitedDist = Math.min(dist, maxRadius);
+      const moveX = Math.cos(angle) * limitedDist;
+      const moveY = Math.sin(angle) * limitedDist;
+
+      stick.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
+
+      // Normalize with dead zone
+      let nx = moveX / maxRadius;
+      let ny = moveY / maxRadius;
+      const mag = Math.sqrt(nx * nx + ny * ny);
+      if (mag < deadZone) {
+        nx = 0;
+        ny = 0;
+      }
+
+      emit(nx, ny);
+
+      // Sprint detection
+      const isSprinting = mag > sprintThreshold;
+      if (isSprinting !== wasSprinting) {
+        wasSprinting = isSprinting;
+        emitSprint(isSprinting);
+        if (base) base.classList.toggle('is-sprinting', isSprinting);
+      }
+    }, { passive: false });
+
+    window.addEventListener('touchend', () => {
+      if (!active) return;
+      active = false;
+      stick.style.transform = 'translate(-50%, -50%)';
+      emit(0, 0);
+      if (wasSprinting) {
+        wasSprinting = false;
+        emitSprint(false);
+      }
+      if (base) {
+        base.classList.remove('is-active', 'is-sprinting');
+      }
+    });
+  }
+</script>

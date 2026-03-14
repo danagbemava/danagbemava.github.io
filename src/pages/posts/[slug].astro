@@ -1,27 +1,48 @@
 ---
-import { getCollection, render } from "astro:content";
-import AppLayout from "../../layouts/AppLayout.astro";
-import { formatDateLabel, toTagString } from "../../lib/content-utils";
+import { getCollection, render } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { formatDateLabel, toTagString, isComplete } from '../../lib/content-utils';
 
 export async function getStaticPaths() {
-  const posts = await getCollection("posts");
-  return posts.map((entry) => ({
-    params: { slug: entry.slug },
-    props: { entry }
-  }));
+  const posts = (await getCollection('posts')).filter(isComplete);
+  return posts.map((entry) => {
+    const slug = entry.id.replace(/\.md$/, '');
+    return {
+      params: { slug },
+      props: { entry },
+    };
+  });
 }
 
 const { entry } = Astro.props;
 const { Content } = await render(entry);
-const tagLabel = toTagString(entry.data.categories) || "Post";
+const tagLabel = toTagString(entry.data.categories) || 'Post';
 const dateLabel = formatDateLabel(entry.data.date);
 ---
 
-<AppLayout title={`${entry.data.title} | Post`} description={`${dateLabel} - ${tagLabel}`}>
-  <section class="entry-page">
+<AppLayout
+  title={`${entry.data.title} | Post`}
+  description={`${dateLabel} - ${tagLabel}`}
+  view="default"
+>
+  <section class="entry-page post-page">
     <article class="entry-shell anim-fade-in">
+      <header class="entry-header-bar">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span>ARCHIVE_LOG // ENCRYPTION_OFF</span>
+        </div>
+        <div>
+          TIMESTAMP: {
+            entry.data.date.toISOString().split('T')[0].replace(/-/g, '.')
+          }
+        </div>
+      </header>
+
       <div class="anim-slide-up">
-        <p class="entry-meta">{dateLabel} • {tagLabel}</p>
+        <p class="entry-meta" style="color: var(--accent-orange)">
+          {dateLabel} • {tagLabel}
+        </p>
         <h1>{entry.data.title}</h1>
       </div>
       <div class="post-content anim-slide-up anim-delay-1">

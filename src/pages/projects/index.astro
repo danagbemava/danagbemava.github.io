@@ -1,31 +1,46 @@
 ---
-import { getCollection } from "astro:content";
-import HolodeckScene from "../../components/HolodeckScene.astro";
-import AppLayout from "../../layouts/AppLayout.astro";
-import { summarizeMarkdown, toTagString } from "../../lib/content-utils";
+import { getCollection } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+import { toTagString, summarizeMarkdown, isComplete } from '../../lib/content-utils';
 
-const projects = (await getCollection("projects")).sort((a, b) =>
-  a.data.title.localeCompare(b.data.title)
-);
-
-const entries = projects.map((project) => ({
-  title: project.data.title,
-  url: `/projects/${project.slug}`,
-  dateLabel: project.data.timeline_year || "Project",
-  tags: toTagString(project.data.stack) || "Project Work",
-  summary: summarizeMarkdown(project.body || "")
-}));
+const projects = (await getCollection('projects')).filter(isComplete);
 ---
 
 <AppLayout
-  title="Projects Holodeck | Willows Bell"
-  description="Browse projects in an interactive 3D holodeck."
-  view="holodeck"
+  title="Projects | Willows Bell"
+  description="Portfolio of software projects and systems."
 >
-  <HolodeckScene
-    kind="projects"
-    title="Projects Holodeck"
-    description="Walk to the holodeck and tap it to browse projects. Select one to project its details."
-    entries={entries}
-  />
+  <section class="listing-page">
+    <header class="listing-header anim-fade-in">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>DOSSIER // ALL_PROJECTS</span>
+      </div>
+      <h1>Projects</h1>
+      <p class="listing-subtitle">Systems, apps, and tools I've built.</p>
+    </header>
+
+    <div class="listing-grid listing-grid--2col anim-slide-up">
+      {
+        projects.map((proj) => (
+          <a class="listing-card holo-panel" href={`/projects/${proj.slug}/`}>
+            <div class="listing-card-header">
+              <span class="listing-card-tag">
+                {toTagString(proj.data.stack) || 'Project'}
+              </span>
+            </div>
+            <h2>{proj.data.title}</h2>
+            <p>{summarizeMarkdown(proj.body || '', 180)}</p>
+            {proj.data.tech && proj.data.tech.length > 0 && (
+              <div class="listing-tech-row">
+                {proj.data.tech.slice(0, 4).map((t) => (
+                  <span class="listing-tech-badge">{t.name}</span>
+                ))}
+              </div>
+            )}
+          </a>
+        ))
+      }
+    </div>
+  </section>
 </AppLayout>

@@ -2,19 +2,49 @@
 import AppLayout from "../layouts/AppLayout.astro";
 ---
 
-<AppLayout title="About | Willows Bell" description="About Daniel Agbemava">
+<AppLayout title="Personnel File | Daniel Agbemava" description="Security Clearance Level 4 // Personnel Record: Daniel Agbemava">
   <section class="about-page">
-    <article class="about-shell">
-      <p class="kicker">About</p>
-      <h1>Daniel Agbemava</h1>
-      <p>
-        Software developer focused on backend and mobile systems, currently working
-        on open source engineering initiatives.
-      </p>
-      <p>
-        This site documents technical decisions, production debugging stories, and
-        project work with an interactive presentation style.
-      </p>
+    <article class="personnel-file anim-fade-in">
+      <header class="file-header">
+        <div class="file-title-group">
+          <div class="file-meta">Record ID: 8829-X-DANIEL // AUTH: LEVEL_4_CLEARANCE</div>
+          <h1>DANIEL AGBEMAVA</h1>
+          <div class="file-meta" style="margin-top: 0.5rem; color: var(--accent-orange)">Role: Principal Systems Architect // Immersive Tech Specialist</div>
+        </div>
+        <div class="file-avatar-container anim-pop">
+          <div class="file-avatar-glitch">
+            <span class="about-avatar-emoji">🤖</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.2s">
+        <div class="file-section-label">Operational Biography</div>
+        <div class="file-content">
+          Software engineer focused on backend and mobile systems, currently working
+          on open source engineering initiatives. Known for bridging the gap between 
+          complex system architecture and immersive user experiences.
+        </div>
+      </div>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.4s">
+        <div class="file-section-label">Mission Objectives</div>
+        <div class="file-content">
+          This site documents technical decisions, production debugging stories, and
+          project work with an interactive presentation style. It serves as a 
+          declassified archive of engineering challenges and solutions.
+        </div>
+      </div>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.6s">
+        <div class="file-section-label">Technical Loadout</div>
+        <div class="tech-grid" style="padding: 1rem; background: rgba(10, 22, 40, 0.3); border-radius: 4px;">
+          <div class="tech-badge"><span>Go / Rust / Java</span></div>
+          <div class="tech-badge"><span>Flutter / React Native</span></div>
+          <div class="tech-badge"><span>Three.js / WebGL</span></div>
+          <div class="tech-badge"><span>Kubernetes / Kafka</span></div>
+        </div>
+      </div>
     </article>
   </section>
 </AppLayout>

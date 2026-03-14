@@ -1,3 +1,4 @@
+import { watch } from "node:fs";
 import { copyFile, mkdir, readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,16 +22,44 @@ const syncDirectory = async ({ source, destination }) => {
   const sourceEntries = (await readdir(source)).filter((name) => name.endsWith(".md"));
   const destinationEntries = (await readdir(destination)).filter((name) => name.endsWith(".md"));
 
-  const validSource = new Set(sourceEntries);
-  const stale = destinationEntries.filter((name) => !validSource.has(name));
-  await Promise.all(stale.map((name) => rm(path.join(destination, name), { force: true })));
-
   await Promise.all(
     sourceEntries.map((name) =>
       copyFile(path.join(source, name), path.join(destination, name))
     )
   );
+
+  const sourceSet = new Set(sourceEntries);
+  const staleEntries = destinationEntries.filter((name) => !sourceSet.has(name));
+  await Promise.all(staleEntries.map((name) => rm(path.join(destination, name), { force: true })));
 };
 
-await Promise.all(pairs.map(syncDirectory));
-console.log("Synced content from _posts and _projects into src/content.");
+const syncAll = async () => {
+  await Promise.all(pairs.map(syncDirectory));
+  console.log("Synced content from _posts and _projects into src/content.");
+};
+
+const watchMode = process.argv.includes("--watch");
+await syncAll();
+
+if (watchMode) {
+  let debounceTimer = null;
+  const scheduleSync = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      syncAll().catch((error) => {
+        console.error("sync-content failed:", error);
+      });
+    }, 100);
+  };
+
+  const watchers = pairs.map(({ source }) => watch(source, scheduleSync));
+  console.log("Watching _posts and _projects for changes...");
+
+  const cleanup = () => {
+    watchers.forEach((watcher) => watcher.close());
+    process.exit(0);
+  };
+
+  process.on("SIGINT", cleanup);
+  process.on("SIGTERM", cleanup);
+}

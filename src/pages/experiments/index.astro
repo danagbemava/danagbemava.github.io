@@ -1,0 +1,50 @@
+---
+import { getCollection } from 'astro:content';
+import AppLayout from '../../layouts/AppLayout.astro';
+
+const experiments = await getCollection('experiments');
+---
+
+<AppLayout
+    title="Experiments | Willows Bell"
+    description="Interactive JavaScript experiments and creative coding explorations."
+>
+    <section class="entry-page experiment-page">
+        <div class="entry-shell anim-fade-in">
+            <header class="entry-header-bar">
+                <div class="status-indicator">
+                    <span class="status-dot"></span>
+                    <span>LABORATORY // EXPERIMENT_INDEX</span>
+                </div>
+                <div>ENTRIES: {experiments.length}</div>
+            </header>
+
+            <div class="anim-slide-up">
+                <h1>Experiments</h1>
+                <p class="experiment-intro">
+                    Interactive JavaScript prototypes and creative coding
+                    explorations.
+                </p>
+            </div>
+
+            <div class="experiment-grid anim-slide-up anim-delay-1">
+                {
+                    experiments.map((exp, i) => (
+                        <a
+                            href={`/experiments/${exp.slug}/`}
+                            class="experiment-card anim-pop"
+                            style={`animation-delay: ${0.2 + i * 0.08}s`}
+                        >
+                            <div class="experiment-card-icon">⬡</div>
+                            <h2>{exp.data.title}</h2>
+                            {exp.data.description && (
+                                <p>{exp.data.description}</p>
+                            )}
+                            <span class="experiment-card-action">Launch →</span>
+                        </a>
+                    ))
+                }
+            </div>
+        </div>
+    </section>
+</AppLayout>

@@ -1,22 +1,85 @@
 ---
+
 ---
 
 <div id="site-loader" class="site-loader" aria-hidden="true">
   <div class="loader-content">
     <div class="loader-ring"></div>
-    <p class="loader-text">Willows Bell</p>
-    <p class="loader-sub">Loading experience…</p>
+    <p class="loader-text">INITIALIZING_HOLODECK</p>
+    <p class="loader-sub">Loading systems... [OK]</p>
+    <div class="loader-log" id="loader-log"></div>
   </div>
 </div>
 
-<script>
-  const loader = document.getElementById("site-loader");
-  if (loader) {
-    window.addEventListener("load", () => {
-      setTimeout(() => {
-        loader.classList.add("loader-done");
-        setTimeout(() => loader.remove(), 600);
-      }, 400);
-    });
+<style>
+  .loader-log {
+    margin-top: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--accent-cyan);
+    opacity: 0.6;
+    text-align: left;
+    height: 4em;
+    overflow: hidden;
   }
+</style>
+
+<script>
+  const messages = [
+    'Mounting file systems...',
+    'Calibrating holographic emitters...',
+    'Establishing neural link...',
+    'Syncing content repositories...',
+    'System Ready.',
+  ];
+
+  const initLoader = () => {
+    const loader = document.getElementById('site-loader');
+    const log = document.getElementById('loader-log');
+    if (!loader) return;
+
+    if (sessionStorage.getItem('holodeck_initialized')) {
+      loader.remove();
+      return;
+    }
+
+    let msgIndex = 0;
+    const addMessage = () => {
+      if (msgIndex < messages.length && log) {
+        const div = document.createElement('div');
+        div.textContent = `> ${messages[msgIndex]}`;
+        log.appendChild(div);
+        msgIndex++;
+        setTimeout(addMessage, 150);
+      }
+    };
+    addMessage();
+
+    let dismissed = false;
+    const dismissLoader = () => {
+      if (dismissed || loader.classList.contains('loader-done')) return;
+      dismissed = true;
+      sessionStorage.setItem('holodeck_initialized', 'true');
+      setTimeout(() => {
+        loader.classList.add('loader-done');
+        setTimeout(() => loader.remove(), 600);
+      }, 300);
+    };
+
+    const onReady = () => dismissLoader();
+    window.addEventListener('load', dismissLoader);
+    window.addEventListener('scene-ready', onReady);
+    setTimeout(dismissLoader, 3000);
+
+    document.addEventListener(
+      'astro:before-preparation',
+      () => {
+        window.removeEventListener('scene-ready', onReady);
+      },
+      { once: true },
+    );
+  };
+
+  initLoader();
+  document.addEventListener('astro:page-load', initLoader);
 </script>

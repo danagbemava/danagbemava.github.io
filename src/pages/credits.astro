@@ -1,0 +1,61 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+import { ASSET_CREDITS } from "../data/asset-credits";
+---
+
+<AppLayout title="Credits | Willows Bell" description="Asset attribution and licensing for models, textures, and audio.">
+  <section class="about-page">
+    <article class="personnel-file anim-fade-in" style="max-width: 64rem;">
+      <header class="file-header">
+        <div class="file-title-group">
+          <div class="file-meta">Asset Attribution Registry</div>
+          <h1>CREDITS</h1>
+          <div class="file-meta" style="margin-top: 0.5rem; color: var(--accent-orange)">
+            Licensing and source attribution for all third-party assets used on this site.
+          </div>
+        </div>
+      </header>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.12s">
+        <div class="file-section-label">Asset Credits</div>
+        <div class="file-content" style="overflow-x: auto; padding: 0; background: transparent;">
+          <table style="width: 100%; border-collapse: collapse; min-width: 760px; font-size: 0.9rem;">
+            <thead>
+              <tr style="text-align: left; color: #9bcdf7;">
+                <th style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.25);">Asset</th>
+                <th style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.25);">Usage</th>
+                <th style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.25);">Creator</th>
+                <th style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.25);">Source</th>
+                <th style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.25);">License</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ASSET_CREDITS.map((asset) => (
+                <tr>
+                  <td style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.14); color: #d8ecff;">{asset.name}</td>
+                  <td style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.14);">{asset.usage}</td>
+                  <td style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.14);">{asset.creator}</td>
+                  <td style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.14);">
+                    <a href={asset.sourceUrl} target="_blank" rel="noreferrer">{asset.source}</a>
+                  </td>
+                  <td style="padding: 0.7rem; border-bottom: 1px solid rgba(79, 195, 247, 0.14);">
+                    <a href={asset.licenseUrl} target="_blank" rel="noreferrer">{asset.license}</a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.22s">
+        <div class="file-section-label">Maintenance Note</div>
+        <div class="file-content">
+          Every time a new external model, texture, animation, or audio file is added, update
+          <code style="margin-left: 0.35rem;">src/data/asset-credits.ts</code>
+          in the same commit.
+        </div>
+      </div>
+    </article>
+  </section>
+</AppLayout>

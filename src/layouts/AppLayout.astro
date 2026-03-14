@@ -1,27 +1,32 @@
 ---
-import "../styles/global.css";
-import "../styles/app.css";
-import SiteLoader from "../components/SiteLoader.astro";
-import SiteFooter from "../components/SiteFooter.astro";
+import { ClientRouter } from 'astro:transitions';
+import '../styles/global.css';
+import '../styles/app.css';
+import SiteLoader from '../components/SiteLoader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
 
 interface Props {
   title?: string;
   description?: string;
-  view?: "default" | "timeline" | "holodeck" | "experiences";
+  view?: 'default' | 'timeline' | 'holodeck' | 'experiences' | 'openworld';
 }
 
 const {
-  title = "Willows Bell",
-  description = "Interactive journal of software projects and posts.",
-  view = "default"
+  title = 'Willows Bell',
+  description = 'Interactive journal of software projects and posts.',
+  view = 'default',
 } = Astro.props;
 
-const path = Astro.url.pathname.replace(/\/+$/, "") || "/";
+const path = Astro.url.pathname.replace(/\/+$/, '') || '/';
 const isActive = (target: string) => {
-  const clean = target.replace(/\/+$/, "") || "/";
-  return path === clean || (clean !== "/" && path.startsWith(`${clean}/`));
+  const clean = target.replace(/\/+$/, '') || '/';
+  return path === clean || (clean !== '/' && path.startsWith(`${clean}/`));
 };
-const isInteractive = view === "timeline" || view === "holodeck" || view === "experiences";
+const isInteractive =
+  view === 'timeline' ||
+  view === 'holodeck' ||
+  view === 'experiences' ||
+  view === 'openworld';
 ---
 
 <!doctype html>
@@ -31,9 +36,15 @@ const isInteractive = view === "timeline" || view === "holodeck" || view === "ex
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css"
+    />
+    <ClientRouter />
   </head>
   <body class={`app view-${view}`}>
+    <div id="transition-glitch" class="transition-glitch" aria-hidden="true">
+    </div>
     <SiteLoader />
     <header class="topbar">
       <a class="brand" href="/">Willows Bell</a>
@@ -41,15 +52,28 @@ const isInteractive = view === "timeline" || view === "holodeck" || view === "ex
         <span></span><span></span><span></span>
       </button>
       <nav class="topnav">
-        <a class={isActive("/") ? "active" : ""} href="/">Home</a>
-        <a class={isActive("/experiences") ? "active" : ""} href="/experiences/">Experiences</a>
-        <a class={isActive("/projects") ? "active" : ""} href="/projects/">Projects</a>
-        <a class={isActive("/posts") ? "active" : ""} href="/posts/">Posts</a>
-        <a class={isActive("/about") ? "active" : ""} href="/about/">About</a>
+        <a class={isActive('/') ? 'active' : ''} href="/">Home</a>
+        <a class={isActive('/experiences') ? 'active' : ''} href="/experiences/"
+          >Experiences</a
+        >
+        <a class={isActive('/projects') ? 'active' : ''} href="/projects/"
+          >Projects</a
+        >
+        <a class={isActive('/posts') ? 'active' : ''} href="/posts/">Posts</a>
+        <a class={isActive('/experiments') ? 'active' : ''} href="/experiments/"
+          >Experiments</a
+        >
+        <a class={isActive('/world') ? 'active' : ''} href="/world/">World</a>
+        <a class={isActive('/about') ? 'active' : ''} href="/about/">About</a>
+        <a class={isActive('/credits') ? 'active' : ''} href="/credits/"
+          >Credits</a
+        >
       </nav>
     </header>
     <div class="wip-banner">
-      🚧 This site is a work in progress. Some features may be incomplete or change.
+      <span class="wip-text-scroll"
+        >SYSTEM STATUS: DEVELOPMENT_MODE // [UNSTABLE_BUILD_VERSION_0.8.4]</span
+      >
     </div>
     <script>
       const btn = document.querySelector('.hamburger');
@@ -59,15 +83,24 @@ const isInteractive = view === "timeline" || view === "holodeck" || view === "ex
         nav?.classList.toggle('is-open', open);
         btn.setAttribute('aria-expanded', String(open));
       });
-      nav?.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
-        btn?.classList.remove('is-open');
-        nav?.classList.remove('is-open');
-        btn?.setAttribute('aria-expanded', 'false');
-      }));
+      nav?.querySelectorAll('a').forEach((a) =>
+        a.addEventListener('click', () => {
+          btn?.classList.remove('is-open');
+          nav?.classList.remove('is-open');
+          btn?.setAttribute('aria-expanded', 'false');
+        }),
+      );
     </script>
     <main class="app-main">
       <slot />
     </main>
-    {!isInteractive && <SiteFooter github="https://github.com" linkedin="https://linkedin.com" />}
+    {
+      !isInteractive && (
+        <SiteFooter
+          github="https://github.com"
+          linkedin="https://linkedin.com"
+        />
+      )
+    }
   </body>
 </html>

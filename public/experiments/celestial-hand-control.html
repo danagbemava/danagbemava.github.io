@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Celestial Hand Control</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            text-shadow: 0 0 10px #4facfe;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+
+        p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            max-width: 300px;
+            margin-top: 5px;
+        }
+
+        /* Video is hidden, we only need the data */
+        #input-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Visualizer for debugging (optional, small corner) */
+        .camera-feed {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            width: 160px;
+            height: 120px;
+            border-radius: 10px;
+            border: 2px solid #4facfe;
+            overflow: hidden;
+            z-index: 20;
+            transform: scaleX(-1);
+            /* Mirror effect */
+            background: #111;
+            display: none;
+            /* Hidden until active */
+        }
+
+        #cam-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            z-index: 20;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .sliders {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(79, 172, 254, 0.3);
+            pointer-events: auto;
+        }
+
+        label {
+            font-size: 0.8rem;
+            color: #4facfe;
+            font-weight: bold;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 150px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(79, 172, 254, 0.8);
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 25px;
+            border-radius: 30px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 15px rgba(79, 172, 254, 0.5);
+        }
+
+        #gesture-guide {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            pointer-events: none;
+            opacity: 0.9;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(8px);
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid rgba(79, 172, 254, 0.2);
+        }
+
+        .guide-item {
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .key {
+            font-weight: bold;
+            color: #4facfe;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        #toast {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #4facfe;
+            padding: 20px 40px;
+            border-radius: 10px;
+            font-size: 1.5rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            z-index: 100;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(79, 172, 254, 0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 1s;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #4facfe;
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loader">
+        <div class="spinner"></div>
+        <div id="loading-text">Initializing Universe...</div>
+    </div>
+
+    <div id="ui-layer">
+        <h1>Celestial Hand Control</h1>
+        <p>Use your webcam to shape the cosmos.</p>
+    </div>
+
+    <div id="gesture-guide">
+        <div class="guide-item"><span class="key">Fist ✊</span> Solar Sphere</div>
+        <div class="guide-item"><span class="key">Point ☝️</span> Sagittarius</div>
+        <div class="guide-item"><span class="key">Open Palm ✋</span> Galaxy</div>
+        <div class="guide-item"><span class="key">Peace ✌️</span> Taurus</div>
+        <div class="guide-item"><span class="key">Rock On 🤘</span> Orion</div>
+        <div class="guide-item"><span class="key">Three 🖖</span> Cassiopeia</div>
+        <div class="guide-item"><span class="key">OK Sign 👌</span> Black Hole</div>
+        <div class="guide-item"><span class="key">Apart 🙌</span> Big Bang</div>
+    </div>
+
+    <div id="toast">Formation Detected</div>
+
+    <video id="input-video" playsinline></video>
+    <div class="camera-feed" id="camera-feed">
+        <canvas id="cam-canvas"></canvas>
+    </div>
+
+    <div class="controls-container">
+        <div class="sliders">
+            <label for="size-slider">Particle Size</label>
+            <input type="range" id="size-slider" min="0.1" max="5.0" step="0.1" value="1.5">
+        </div>
+        <div class="controls">
+            <button id="cam-btn" class="btn" onclick="toggleCamera()">
+                <span>📷</span> Enable Camera
+            </button>
+            <button class="btn" onclick="resetUniverse()">Reset</button>
+        </div>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <script>
+        /**
+         * INTERNAL TWEEN IMPLEMENTATION
+         */
+        const TWEEN = {
+            tweens: [],
+            getAll: function () { return this.tweens; },
+            removeAll: function () { this.tweens = []; },
+            add: function (tween) { this.tweens.push(tween); },
+            remove: function (tween) {
+                const i = this.tweens.indexOf(tween);
+                if (i !== -1) this.tweens.splice(i, 1);
+            },
+            update: function (time) {
+                if (this.tweens.length === 0) return false;
+                let i = 0;
+                time = time !== undefined ? time : performance.now();
+                while (i < this.tweens.length) {
+                    if (this.tweens[i].update(time)) {
+                        i++;
+                    } else {
+                        this.tweens.splice(i, 1);
+                    }
+                }
+                return true;
+            },
+            Easing: {
+                Exponential: {
+                    InOut: function (k) {
+                        if (k === 0) return 0;
+                        if (k === 1) return 1;
+                        if ((k *= 2) < 1) return 0.5 * Math.pow(1024, k - 1);
+                        return 0.5 * (-Math.pow(2, -10 * (k - 1)) + 2);
+                    },
+                    Out: function (k) {
+                        return k === 1 ? 1 : 1 - Math.pow(2, -10 * k);
+                    }
+                },
+                Elastic: {
+                    Out: function (k) {
+                        if (k === 0) return 0;
+                        if (k === 1) return 1;
+                        return Math.pow(2, -10 * k) * Math.sin((k * 10 - 0.75) * (2 * Math.PI) / 0.3) + 1;
+                    }
+                }
+            }
+        };
+
+        class Tween {
+            constructor(object) {
+                this.object = object;
+                this.valuesStart = {};
+                this.valuesEnd = {};
+                this.duration = 1000;
+                this.startTime = null;
+                this.easingFunction = TWEEN.Easing.Exponential.InOut;
+                this.onUpdateCallback = null;
+            }
+            to(properties, duration) {
+                this.valuesEnd = properties;
+                if (duration !== undefined) this.duration = duration;
+                return this;
+            }
+            easing(easing) {
+                this.easingFunction = easing;
+                return this;
+            }
+            onUpdate(callback) {
+                this.onUpdateCallback = callback;
+                return this;
+            }
+            start(time) {
+                this.startTime = time !== undefined ? time : performance.now();
+                for (const property in this.valuesEnd) {
+                    this.valuesStart[property] = parseFloat(this.object[property]);
+                }
+                TWEEN.add(this);
+                return this;
+            }
+            update(time) {
+                if (time < this.startTime) return true;
+                let elapsed = (time - this.startTime) / this.duration;
+                elapsed = elapsed > 1 ? 1 : elapsed;
+                const value = this.easingFunction(elapsed);
+                for (const property in this.valuesEnd) {
+                    const start = this.valuesStart[property];
+                    const end = this.valuesEnd[property];
+                    this.object[property] = start + (end - start) * value;
+                }
+                if (this.onUpdateCallback) this.onUpdateCallback(this.object);
+                return elapsed < 1;
+            }
+        }
+        TWEEN.Tween = Tween;
+
+        /**
+         * APPLICATION CONFIG
+         */
+        const CONFIG = {
+            particleCount: 8000,
+            baseSize: 1.5,
+        };
+
+        let scene, camera, renderer, controls;
+        let particles, geometry, material;
+        // Expanded target list
+        let targets = {
+            universe: [],
+            sphere: [],
+            galaxy: [],
+            sagittarius: [],
+            bigbang: [],
+            taurus: [],
+            orion: [],
+            cassiopeia: [],
+            blackhole: []
+        };
+        let currentShape = 'universe';
+        const toast = document.getElementById('toast');
+        const sizeSlider = document.getElementById('size-slider');
+
+        // Hand Tracking Vars
+        let hands;
+        let cameraFeed;
+        let isCameraActive = false;
+        let handDistanceHistory = [];
+
+        // --- INITIALIZATION ---
+        init();
+        animate();
+
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.0015);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+            camera.position.z = 400;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.3;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            createParticles();
+
+            // Slider Event
+            sizeSlider.addEventListener('input', (e) => {
+                if (material && material.uniforms) {
+                    material.uniforms.globalScale.value = parseFloat(e.target.value);
+                }
+            });
+
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Remove Loader
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 1000);
+                }
+            }, 1000);
+        }
+
+        // --- PARTICLE SYSTEMS ---
+        function createParticles() {
+            geometry = new THREE.BufferGeometry();
+            const positions = [];
+            const colors = [];
+            const sizes = [];
+            const colorObj = new THREE.Color();
+
+            // Element Types Definition
+            const elements = [
+                { type: 'stardust', r: 0.7, sizeMin: 0.5, sizeMax: 2.0, colors: [0x4facfe, 0x00f2fe, 0x5f2c82, 0x00c6ff] },
+                { type: 'star', r: 0.25, sizeMin: 3.0, sizeMax: 6.0, colors: [0xffffff, 0xffeebb, 0xffd700] },
+                { type: 'giant', r: 0.05, sizeMin: 8.0, sizeMax: 15.0, colors: [0xff6b6b, 0xff416c, 0xff8c00] }
+            ];
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const x = (Math.random() * 2 - 1) * 800;
+                const y = (Math.random() * 2 - 1) * 800;
+                const z = (Math.random() * 2 - 1) * 800;
+
+                positions.push(x, y, z);
+                targets.universe.push(new THREE.Vector3(x, y, z));
+                targets.bigbang.push(new THREE.Vector3(0, 0, 0));
+
+                // Determine Element Type
+                const rand = Math.random();
+                let type;
+                if (rand < elements[0].r) type = elements[0];
+                else if (rand < elements[0].r + elements[1].r) type = elements[1];
+                else type = elements[2];
+
+                // Assign Color
+                colorObj.setHex(type.colors[Math.floor(Math.random() * type.colors.length)]);
+                colors.push(colorObj.r, colorObj.g, colorObj.b);
+
+                // Assign Size
+                const s = type.sizeMin + Math.random() * (type.sizeMax - type.sizeMin);
+                sizes.push(s);
+            }
+
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+            // Custom Shader Material
+            material = new THREE.ShaderMaterial({
+                uniforms: {
+                    pointTexture: { value: getStarTexture() },
+                    globalScale: { value: parseFloat(sizeSlider.value) }
+                },
+                vertexShader: `
+                    attribute float size;
+                    varying vec3 vColor;
+                    uniform float globalScale;
+                    void main() {
+                        vColor = color;
+                        vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                        gl_PointSize = size * globalScale * ( 300.0 / -mvPosition.z );
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform sampler2D pointTexture;
+                    varying vec3 vColor;
+                    void main() {
+                        gl_FragColor = vec4( vColor, 1.0 );
+                        gl_FragColor = gl_FragColor * texture2D( pointTexture, gl_PointCoord );
+                        if ( gl_FragColor.a < 0.1 ) discard;
+                    }
+                `,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                transparent: true,
+                vertexColors: true
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+
+            calculateShapes();
+        }
+
+        function getStarTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.2, 'rgba(255,255,255,0.8)');
+            grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 32, 32);
+            const tex = new THREE.Texture(canvas);
+            tex.needsUpdate = true;
+            return tex;
+        }
+
+        function calculateShapes() {
+            // Helper for linearly interpolating points
+            const fillPoints = (targetArr, p1, p2, count) => {
+                for (let k = 0; k < count; k++) {
+                    const alpha = Math.random();
+                    const v = new THREE.Vector3().lerpVectors(p1, p2, alpha);
+                    // Add noise
+                    v.x += (Math.random() - 0.5) * 15;
+                    v.y += (Math.random() - 0.5) * 15;
+                    v.z += (Math.random() - 0.5) * 15;
+                    targetArr.push(v);
+                }
+            };
+
+            // 1. Sphere
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const phi = Math.acos(-1 + (2 * i) / CONFIG.particleCount);
+                const theta = Math.sqrt(CONFIG.particleCount * Math.PI) * phi;
+                const v = new THREE.Vector3();
+                v.setFromSphericalCoords(300, phi, theta);
+                targets.sphere.push(v);
+            }
+
+            // 2. Galaxy
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const angle = i * 0.05;
+                const r = i * 0.12;
+                const armOffset = (i % 3) * (Math.PI * 2 / 3);
+                const x = Math.cos(angle + armOffset) * r * 2.5;
+                const y = (Math.random() - 0.5) * 60;
+                const z = Math.sin(angle + armOffset) * r * 2.5;
+                targets.galaxy.push(new THREE.Vector3(x, y, z));
+            }
+
+            // 3. Sagittarius (Approximation)
+            const sagPoints = [
+                new THREE.Vector3(0, 0, 0), new THREE.Vector3(50, 40, 0),
+                new THREE.Vector3(30, 80, 0), new THREE.Vector3(-40, 30, 0),
+                new THREE.Vector3(80, 50, 0), new THREE.Vector3(-60, 100, 0),
+                new THREE.Vector3(-80, 60, 0), new THREE.Vector3(120, 50, 0),
+            ].map(v => v.multiplyScalar(3.5));
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const idx = i % sagPoints.length;
+                const p1 = sagPoints[idx];
+                const p2 = sagPoints[(idx + 1) % sagPoints.length];
+                const alpha = Math.random();
+
+                if (Math.random() > 0.4) {
+                    // Cluster around star
+                    const x = p1.x + (Math.random() - 0.5) * 60;
+                    const y = p1.y + (Math.random() - 0.5) * 60;
+                    const z = p1.z + (Math.random() - 0.5) * 60;
+                    targets.sagittarius.push(new THREE.Vector3(x, y, z));
+                } else {
+                    // Line
+                    const mixed = new THREE.Vector3().lerpVectors(p1, p2, alpha);
+                    mixed.x += (Math.random() - 0.5) * 10;
+                    mixed.y += (Math.random() - 0.5) * 10;
+                    mixed.z += (Math.random() - 0.5) * 10;
+                    targets.sagittarius.push(mixed);
+                }
+            }
+
+            // 4. Taurus (V Shape)
+            const taurusCenter = new THREE.Vector3(0, -50, 0);
+            const hornLeft = new THREE.Vector3(-150, 150, 0);
+            const hornRight = new THREE.Vector3(150, 150, 0);
+
+            let taurusArr = [];
+            fillPoints(taurusArr, taurusCenter, hornLeft, CONFIG.particleCount / 2);
+            fillPoints(taurusArr, taurusCenter, hornRight, CONFIG.particleCount / 2);
+            // Copy to target array logic (handling overflow/underflow if count doesn't match perfectly)
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                targets.taurus.push(taurusArr[i % taurusArr.length]);
+            }
+
+            // 5. Orion (Hourglass / Hunter)
+            const shoulderL = new THREE.Vector3(-100, 150, 0);
+            const shoulderR = new THREE.Vector3(100, 150, 0);
+            const beltL = new THREE.Vector3(-30, 0, 0);
+            const beltC = new THREE.Vector3(0, 0, 0);
+            const beltR = new THREE.Vector3(30, 0, 0);
+            const kneeL = new THREE.Vector3(-80, -150, 0);
+            const kneeR = new THREE.Vector3(80, -150, 0);
+
+            let orionArr = [];
+            const orionPairs = [
+                [shoulderL, beltL], [shoulderR, beltR],
+                [beltL, kneeL], [beltR, kneeR],
+                [beltL, beltR], // Belt
+                [shoulderL, new THREE.Vector3(-130, 200, 0)], // Arm up
+                [shoulderR, new THREE.Vector3(150, 150, 0)] // Shield arm
+            ];
+
+            orionPairs.forEach(pair => {
+                fillPoints(orionArr, pair[0], pair[1], Math.ceil(CONFIG.particleCount / orionPairs.length));
+            });
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                targets.orion.push(orionArr[i % orionArr.length]);
+            }
+
+            // 6. Cassiopeia (W Shape)
+            const cassPoints = [
+                new THREE.Vector3(-150, 100, 0),
+                new THREE.Vector3(-75, -50, 0),
+                new THREE.Vector3(0, 50, 0),
+                new THREE.Vector3(75, -50, 0),
+                new THREE.Vector3(150, 100, 0)
+            ];
+            let cassArr = [];
+            for (let i = 0; i < cassPoints.length - 1; i++) {
+                fillPoints(cassArr, cassPoints[i], cassPoints[i + 1], Math.ceil(CONFIG.particleCount / 4));
+            }
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                targets.cassiopeia.push(cassArr[i % cassArr.length]);
+            }
+
+            // 7. Black Hole (Accretion Disk)
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                // Ring with hole
+                const angle = Math.random() * Math.PI * 2;
+                // Radius from 100 to 400 (Hole 0-100)
+                const r = 120 + Math.random() * 250;
+
+                // Add spiral effect
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+                // Flat disk with slight bulge
+                const y = (Math.random() - 0.5) * (4000 / r);
+
+                targets.blackhole.push(new THREE.Vector3(x, y, z));
+            }
+        }
+
+        // --- COMPUTER VISION LOGIC ---
+
+        async function toggleCamera() {
+            const btn = document.getElementById('cam-btn');
+            const feedContainer = document.getElementById('camera-feed');
+            const videoElement = document.getElementById('input-video');
+
+            if (isCameraActive) {
+                isCameraActive = false;
+                if (videoElement.srcObject) {
+                    const tracks = videoElement.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    videoElement.srcObject = null;
+                }
+                btn.innerHTML = '<span>📷</span> Enable Camera';
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+                btn.style.color = 'white';
+                feedContainer.style.display = 'none';
+                controls.enabled = true;
+                return;
+            }
+
+            btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px;display:inline-block;margin:0;"></span> Loading AI...';
+
+            if (!hands) {
+                hands = new Hands({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                    }
+                });
+
+                hands.setOptions({
+                    maxNumHands: 2,
+                    modelComplexity: 1,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                hands.onResults(onHandResults);
+            }
+
+            if (!cameraFeed) {
+                cameraFeed = new Camera(videoElement, {
+                    onFrame: async () => {
+                        if (isCameraActive) {
+                            await hands.send({ image: videoElement });
+                        }
+                    },
+                    width: 640,
+                    height: 480
+                });
+            }
+
+            await cameraFeed.start();
+            isCameraActive = true;
+            btn.innerHTML = '🔴 Stop Camera';
+            btn.style.borderColor = '#ff4444';
+            btn.style.color = '#fff';
+            feedContainer.style.display = 'block';
+
+            const camCanvas = document.getElementById('cam-canvas');
+            const ctx = camCanvas.getContext('2d');
+            function drawLoop() {
+                if (!isCameraActive) return;
+                ctx.drawImage(videoElement, 0, 0, camCanvas.width, camCanvas.height);
+                requestAnimationFrame(drawLoop);
+            }
+            drawLoop();
+        }
+
+        function onHandResults(results) {
+            const canvasCtx = document.getElementById('cam-canvas').getContext('2d');
+            if (results.multiHandLandmarks) {
+                for (const landmarks of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
+                    drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 2 });
+                }
+                detectGesture(results.multiHandLandmarks);
+            }
+        }
+
+        function detectGesture(allLandmarks) {
+            if (!allLandmarks || allLandmarks.length === 0) return;
+
+            const hand1 = allLandmarks[0];
+            const hand2 = allLandmarks.length > 1 ? allLandmarks[1] : null;
+
+            // 1. ZOOM (Scale camera based on hand size)
+            const size = dist(hand1[0], hand1[5]);
+            const targetCamZ = 1200 - (size * 4000);
+            camera.position.z += (THREE.MathUtils.clamp(targetCamZ, 100, 1000) - camera.position.z) * 0.05;
+
+            // 2. TWO HAND GESTURE: Big Bang
+            if (hand2) {
+                const center1 = hand1[9];
+                const center2 = hand2[9];
+                const d = dist(center1, center2);
+
+                handDistanceHistory.push({ d: d, t: performance.now() });
+                if (handDistanceHistory.length > 10) handDistanceHistory.shift();
+
+                if (handDistanceHistory.length >= 5) {
+                    const oldest = handDistanceHistory[0];
+                    const newest = handDistanceHistory[handDistanceHistory.length - 1];
+                    const vel = (newest.d - oldest.d) / (newest.t - oldest.t);
+
+                    if (vel > 0.0005 && d > 0.4 && currentShape !== 'bigbang') {
+                        triggerFormation('bigbang', targets.universe);
+                        showToast("💥 BIG BANG 💥");
+                        return;
+                    }
+                }
+            }
+
+            // 3. SINGLE HAND GESTURES
+
+            // Helper functions for fingers (Up/Down based on Y coordinates)
+            // Note: In MediaPipe, Y increases downwards. Tip < Base means finger is UP.
+
+            const isThumbUp = (lm) => lm[4].y < lm[3].y;
+            // Index
+            const isIndexUp = (lm) => lm[8].y < lm[6].y;
+            // Middle
+            const isMiddleUp = (lm) => lm[12].y < lm[10].y;
+            // Ring
+            const isRingUp = (lm) => lm[16].y < lm[14].y;
+            // Pinky
+            const isPinkyUp = (lm) => lm[20].y < lm[18].y;
+
+            // -- FIST (Sun) -- 
+            // All fingers curled down
+            const isFist = !isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
+
+            // -- POINT (Sagittarius) --
+            // Index Up, Others Down
+            const isPointing = isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
+
+            // -- OPEN PALM (Galaxy) --
+            // All fingers Up
+            const isOpenPalm = isIndexUp(hand1) && isMiddleUp(hand1) && isRingUp(hand1) && isPinkyUp(hand1);
+
+            // -- PEACE/VICTORY (Taurus) --
+            // Index & Middle Up, Ring & Pinky Down
+            const isPeace = isIndexUp(hand1) && isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
+
+            // -- ROCK ON (Orion) --
+            // Index & Pinky Up, Middle & Ring Down
+            const isRock = isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && isPinkyUp(hand1);
+
+            // -- THREE/W (Cassiopeia) --
+            // Index, Middle, Ring Up, Pinky Down (Thumb doesn't matter much)
+            const isThree = isIndexUp(hand1) && isMiddleUp(hand1) && isRingUp(hand1) && !isPinkyUp(hand1);
+
+            // -- OK SIGN (Black Hole) --
+            // Distance between Index Tip (8) and Thumb Tip (4) is small
+            const dOk = dist(hand1[8], hand1[4]);
+            const isOk = dOk < 0.05 && isMiddleUp(hand1) && isRingUp(hand1); // Middle/Ring up helps distinguish from fist
+
+            // Trigger Logic
+            if (isOk && currentShape !== 'blackhole') {
+                triggerFormation('blackhole', targets.blackhole);
+                showToast("Black Hole ⚫");
+            }
+            else if (isRock && currentShape !== 'orion') {
+                triggerFormation('orion', targets.orion);
+                showToast("Orion Hunter 🏹");
+            }
+            else if (isPeace && currentShape !== 'taurus') {
+                triggerFormation('taurus', targets.taurus);
+                showToast("Taurus Bull 🐂");
+            }
+            else if (isThree && currentShape !== 'cassiopeia') {
+                triggerFormation('cassiopeia', targets.cassiopeia);
+                showToast("Cassiopeia 👑");
+            }
+            else if (isFist && currentShape !== 'sphere') {
+                triggerFormation('sphere', targets.sphere);
+                showToast("Solar Sphere ☀️");
+            }
+            else if (isPointing && currentShape !== 'sagittarius') {
+                triggerFormation('sagittarius', targets.sagittarius);
+                showToast("Sagittarius 🏹");
+            }
+            else if (isOpenPalm && currentShape !== 'galaxy' && !hand2) {
+                triggerFormation('galaxy', targets.galaxy);
+                showToast("Galaxy Spiral 🌀");
+            }
+        }
+
+        function dist(p1, p2) {
+            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+        }
+
+        // --- ANIMATION & LOGIC ---
+
+        function triggerFormation(name, targetSet) {
+            currentShape = name;
+
+            if (name === 'bigbang') {
+                transformTo(targets.bigbang, 500);
+                setTimeout(() => {
+                    transformTo(targets.universe, 300, TWEEN.Easing.Exponential.Out);
+                }, 600);
+            } else if (name === 'blackhole') {
+                transformTo(targetSet, 2000, TWEEN.Easing.Elastic.Out);
+            } else {
+                transformTo(targetSet, 1500);
+            }
+        }
+
+        function transformTo(targetSet, duration, easing) {
+            TWEEN.removeAll();
+            const positions = particles.geometry.attributes.position.array;
+            const ease = easing || TWEEN.Easing.Exponential.InOut;
+
+            for (let i = 0; i < CONFIG.particleCount; i++) {
+                const target = targetSet[i];
+                const offset = i * 3;
+                const current = { x: positions[offset], y: positions[offset + 1], z: positions[offset + 2] };
+
+                new TWEEN.Tween(current)
+                    .to({ x: target.x, y: target.y, z: target.z }, Math.random() * duration + duration)
+                    .easing(ease)
+                    .onUpdate(() => {
+                        positions[offset] = current.x;
+                        positions[offset + 1] = current.y;
+                        positions[offset + 2] = current.z;
+                    })
+                    .start();
+            }
+        }
+
+        function resetUniverse() {
+            triggerFormation('universe', targets.universe);
+            showToast("Universe Reset");
+        }
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translate(-50%, -50%) scale(1.1)';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translate(-50%, -50%) scale(1)';
+            }, 2500);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            if (!isCameraActive) controls.update();
+
+            if (particles) {
+                particles.rotation.y += 0.0005;
+                particles.geometry.attributes.position.needsUpdate = true;
+            }
+            renderer.render(scene, camera);
+        }
+
+    </script>
+</body>
+
+</html>
