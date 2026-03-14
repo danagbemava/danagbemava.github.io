@@ -2,6 +2,7 @@
 layout: page
 title:  "Locqar v2"
 permalink: /projects/locqar-v2
+status: incomplete
 ---
 
 ### Summary

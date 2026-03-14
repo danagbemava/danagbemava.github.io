@@ -7,11 +7,10 @@
     "node": ">=20.17.0"
   },
   "scripts": {
-    "sync-content": "node scripts/sync-content.mjs",
     "sync-assets": "node scripts/download-world-assets.mjs",
     "sync-assets:dry": "node scripts/download-world-assets.mjs --dry-run",
-    "dev": "node scripts/dev.mjs",
-    "build": "npm run sync-content && astro build",
+    "dev": "astro dev",
+    "build": "astro build",
     "preview": "astro preview"
   },
   "dependencies": {
