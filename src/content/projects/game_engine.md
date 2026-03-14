@@ -1,6 +1,6 @@
 ---
 layout: page
-title: "Agriconnect Game Engine"
+title:  "Agriconnect Game Engine"
 permalink: /projects/game_engine
 ---
 
@@ -24,6 +24,23 @@ A gamification engine built with Spring Boot and Java that powers the reward and
 ---
 
 ## Architecture
+
+### High-Level Overview
+
+```
+┌───────────────────┐       Kafka Events       ┌──────────────────┐
+│  Students &       │ ─────────────────────────►│   Game Engine    │
+│  Institutions     │  (course completions,     │   Service        │
+│  Service          │   assessments, logins)    │                  │
+└───────────────────┘                           └────────┬─────────┘
+                                                         │
+┌───────────────────┐       Kafka Events                 │
+│  Billing &        │ ─────────────────────────►         │
+│  Payments         │  (payment confirmations)           ▼
+│  Service          │                              ┌──────────┐
+└───────────────────┘                              │ MongoDB  │
+                                                   └──────────┘
+```
 
 ### Technology Stack
 
