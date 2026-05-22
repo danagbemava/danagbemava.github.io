@@ -1050,6 +1050,14 @@ h3 {
   font-size: 1.05rem;
 }
 
+.entry-shell p {
+  margin: 0 0 1.1rem;
+}
+
+.entry-shell p:last-child {
+  margin-bottom: 0;
+}
+
 .entry-shell :where(h2, h3, h4, h5, h6) {
   margin: 2rem 0 0.9rem;
   line-height: 1.2;
