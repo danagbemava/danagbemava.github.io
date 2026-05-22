@@ -1,10 +1,15 @@
 import { defineConfig } from "astro/config";
 
 import tailwindcss from "@tailwindcss/vite";
+import remarkEmoji from "remark-emoji";
 
 export default defineConfig({
   site: "https://danagbemava.github.io",
   output: "static",
+
+  markdown: {
+    remarkPlugins: [remarkEmoji],
+  },
 
   vite: {
     plugins: [tailwindcss()],
