@@ -127,6 +127,19 @@ const bootOpenWorld = () => {
   renderer.toneMappingExposure = lowPower ? 0.92 : 1.0;
   renderer.shadowMap.enabled = !lowPower;
 
+  let bloomPipeline = null;
+  let bloomRequested = false;
+  const ensureBloom = () => {
+    if (bloomRequested || lowPower) return;
+    bloomRequested = true;
+    import("./open-world-fx.js")
+      .then(({ createBloomPipeline }) => createBloomPipeline(renderer, scene, camera))
+      .then((pipeline) => {
+        bloomPipeline = pipeline;
+        if (bloomPipeline) onResize();
+      });
+  };
+
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x08041a);
   scene.fog = new THREE.FogExp2(0x0a0520, lowPower ? 0.01 : 0.008);
@@ -582,6 +595,7 @@ const bootOpenWorld = () => {
     const height = canvas.clientHeight || window.innerHeight;
     renderer.setSize(width, height, false);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap, tierDprCaps[getEffectiveQualityTier()]));
+    if (bloomPipeline) bloomPipeline.setSize(width, height);
     camera.aspect = width / height;
     camera.fov = cameraMode === "isometric" ? (isTouch ? 50 : 46) : (isTouch ? 68 : 58);
     camera.updateProjectionMatrix();
@@ -830,7 +844,13 @@ const bootOpenWorld = () => {
 
     // Render
     quickLook.render(dt);
-    renderer.render(scene, camera);
+    if (qualityTier === 2) {
+      if (!bloomPipeline) ensureBloom();
+      if (bloomPipeline) bloomPipeline.render();
+      else renderer.render(scene, camera);
+    } else {
+      renderer.render(scene, camera);
+    }
     rafId = requestAnimationFrame(tick);
   };
 
@@ -901,6 +921,7 @@ const bootOpenWorld = () => {
       }
     });
     quickLook.dispose();
+    if (bloomPipeline) bloomPipeline.dispose();
     renderer.dispose();
   };
 };
