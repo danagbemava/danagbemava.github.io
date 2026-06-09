@@ -234,6 +234,14 @@ const bootOpenWorld = () => {
     try { window.localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch { /* ignore */ }
   };
 
+  // The tutorial overlay sits above the canvas, so taps on it never reach
+  // the canvas pointerdown handler — it must dismiss itself.
+  const onTutorialTap = () => {
+    safeAudio(() => primeAudio());
+    dismissTutorial();
+  };
+  if (tutorialEl) tutorialEl.addEventListener("pointerdown", onTutorialTap);
+
   initialAssets.then(() => {
     updateLoadingHint("Ready");
     setTimeout(() => { dismissLoading(); showTutorialIfNew(); }, 300);
@@ -971,6 +979,7 @@ const bootOpenWorld = () => {
     qualityModeBtn.removeEventListener("click", onQualityModeClick);
     actionBtn.removeEventListener("click", tryInspect);
     els.starmapBtn.removeEventListener("click", onStarmapBtn);
+    if (tutorialEl) tutorialEl.removeEventListener("pointerdown", onTutorialTap);
 
     stopWorldEvents();
     safeAudio(() => updateProximityHum(0));

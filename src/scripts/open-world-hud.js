@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { summarizeExperience, districtConfig } from "./open-world-config.js";
+import { summarizeExperience } from "./open-world-config.js";
 import { buildQuickMesh } from "./open-world-entries.js";
 
 /**
