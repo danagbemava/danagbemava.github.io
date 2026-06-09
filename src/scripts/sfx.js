@@ -397,6 +397,65 @@ export const playSecretFound = () => {
   });
 };
 
+// -- Warp charge: rising tension before a jump --
+export const playWarpCharge = () => {
+  const c = ensure();
+  const dur = 0.45;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(60, c.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(320, c.currentTime + dur);
+  gain.gain.setValueAtTime(0.04, c.currentTime);
+  gain.gain.linearRampToValueAtTime(0.14, c.currentTime + dur);
+  gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur + 0.08);
+  osc.connect(gain).connect(masterGain);
+  osc.start(c.currentTime);
+  osc.stop(c.currentTime + dur + 0.08);
+};
+
+// -- Warp tunnel: long filtered-noise whoosh --
+export const playWarpTunnel = () => {
+  const c = ensure();
+  const dur = 1.5;
+  const bufSize = c.sampleRate * dur;
+  const buf = c.createBuffer(1, bufSize, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+  const noise = c.createBufferSource();
+  noise.buffer = buf;
+  const bandpass = c.createBiquadFilter();
+  bandpass.type = "bandpass";
+  bandpass.frequency.setValueAtTime(400, c.currentTime);
+  bandpass.frequency.exponentialRampToValueAtTime(2400, c.currentTime + dur * 0.4);
+  bandpass.frequency.exponentialRampToValueAtTime(300, c.currentTime + dur);
+  bandpass.Q.value = 2;
+  const nGain = c.createGain();
+  nGain.gain.setValueAtTime(0, c.currentTime);
+  nGain.gain.linearRampToValueAtTime(0.2, c.currentTime + 0.2);
+  nGain.gain.linearRampToValueAtTime(0.0, c.currentTime + dur);
+  noise.connect(bandpass).connect(nGain).connect(masterGain);
+  noise.start(c.currentTime);
+  noise.stop(c.currentTime + dur);
+};
+
+// -- Arrival chime: two soft sines --
+export const playArrival = () => {
+  const c = ensure();
+  [660, 990].forEach((freq, i) => {
+    const osc = c.createOscillator();
+    const g = c.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, c.currentTime + i * 0.12);
+    g.gain.setValueAtTime(0, c.currentTime + i * 0.12);
+    g.gain.linearRampToValueAtTime(0.09, c.currentTime + i * 0.12 + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + i * 0.12 + 0.5);
+    osc.connect(g).connect(masterGain);
+    osc.start(c.currentTime + i * 0.12);
+    osc.stop(c.currentTime + i * 0.12 + 0.5);
+  });
+};
+
 // -- Ambient loop from file --
 let ambientSource = null;
 let ambientGain = null;

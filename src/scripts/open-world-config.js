@@ -121,6 +121,97 @@ export const getStartPosition = (zone) => {
   return new THREE.Vector3(config.center.x, 0, config.center.z + 5);
 };
 
+// ── Destinations (planet world) ──────────────────────────────────
+// Keys match world-state zone keys. `planet` describes the body as seen
+// from space; `gates` are warp gates placed in that scene.
+export const destinations = {
+  home: {
+    key: "home", name: "Nexus Station", title: "NEXUS STATION", kicker: "Orbital Hub",
+    accent: 0xc8b0ff, accentSoft: "rgba(200, 176, 255, 0.2)",
+    blurb: "Orbital command station. Three worlds hang in the dark beyond the gates.",
+    objective: "Step through a warp gate, or open the starmap [M].",
+    sky: { top: 0x06021a, horizon: 0x1a0f3a, bottom: 0x030110 },
+    fog: { color: 0x0a0520, density: 0.0032 },
+    lights: { ambient: 1.0, rim: 0.55 },
+    vacuum: true, biome: null, boundsRadius: 13,
+    spawn: { x: 0, z: 8 },
+    gates: [
+      { to: "projects", x: -11, z: 0, rotationY: Math.PI / 2 },
+      { to: "posts", x: 11, z: 0, rotationY: -Math.PI / 2 },
+      { to: "experiences", x: 0, z: -11, rotationY: 0 }
+    ],
+    planet: null
+  },
+  projects: {
+    key: "projects", name: "Forge", title: "FORGE", kicker: "Stellar Foundry",
+    accent: 0xff6b35, accentSoft: "rgba(255, 107, 53, 0.22)",
+    blurb: "A molten world where systems are hammered into shape in crucibles of light.",
+    objective: "Inspect a project node and ignite the Forge Core.",
+    sky: { top: 0x0c0302, horizon: 0x521b06, bottom: 0x1a0804 },
+    fog: { color: 0x2a0e04, density: 0.006 },
+    lights: { ambient: 0.88, rim: 0.72 },
+    vacuum: false, biome: "forge", boundsRadius: 40,
+    spawn: { x: 0, z: 27 },
+    gates: [
+      { to: "home", x: 0, z: 33, rotationY: Math.PI },
+      { to: "posts", x: 28, z: 18, rotationY: -Math.PI / 3 },
+      { to: "experiences", x: -28, z: 18, rotationY: Math.PI / 3 }
+    ],
+    planet: { surfaceColor: 0x35140a, emissive: 0x802a08, limbColor: 0xff8a50, radius: 22, ring: "ember", skyDir: [-1, 0.28, -0.35], skyDist: 165 },
+    groundColor: 0x1a0a05
+  },
+  posts: {
+    key: "posts", name: "Signal", title: "SIGNAL", kicker: "Relay World",
+    accent: 0x00e5ff, accentSoft: "rgba(0, 229, 255, 0.2)",
+    blurb: "A crystalline world of relay spires, broadcasting beneath an aurora sky.",
+    objective: "Inspect a signal node and pulse the Relay Spire.",
+    sky: { top: 0x020a12, horizon: 0x0a3a4a, bottom: 0x04141c },
+    fog: { color: 0x07222c, density: 0.0055 },
+    lights: { ambient: 1.08, rim: 0.62 },
+    vacuum: false, biome: "signal", boundsRadius: 40,
+    spawn: { x: 0, z: 27 },
+    gates: [
+      { to: "home", x: 0, z: 33, rotationY: Math.PI },
+      { to: "projects", x: -28, z: 18, rotationY: Math.PI / 3 },
+      { to: "experiences", x: 28, z: 18, rotationY: -Math.PI / 3 }
+    ],
+    planet: { surfaceColor: 0x0a2030, emissive: 0x0a4a5a, limbColor: 0x60f0ff, radius: 20, ring: "discs", skyDir: [1, 0.32, -0.4], skyDist: 170 },
+    groundColor: 0x06141c
+  },
+  experiences: {
+    key: "experiences", name: "Grove", title: "GROVE", kicker: "Living Archive",
+    accent: 0x7dffb3, accentSoft: "rgba(125, 255, 179, 0.2)",
+    blurb: "A living world. Career echoes bloom as bioluminescent flora across the archive.",
+    objective: "Inspect a memory node and resonate the Bloom Heart.",
+    sky: { top: 0x02120a, horizon: 0x0e4a28, bottom: 0x04180c },
+    fog: { color: 0x0a2a16, density: 0.0058 },
+    lights: { ambient: 1.12, rim: 0.68 },
+    vacuum: false, biome: "grove", boundsRadius: 40,
+    spawn: { x: 0, z: 27 },
+    gates: [
+      { to: "home", x: 0, z: 33, rotationY: Math.PI },
+      { to: "projects", x: -28, z: 18, rotationY: Math.PI / 3 },
+      { to: "posts", x: 28, z: 18, rotationY: -Math.PI / 3 }
+    ],
+    planet: { surfaceColor: 0x0c2a14, emissive: 0x1a5a2a, limbColor: 0xa0ffce, radius: 21, ring: null, skyDir: [0, 0.45, -1], skyDist: 155 },
+    groundColor: 0x07180d
+  }
+};
+
+export const destinationKeys = Object.keys(destinations);
+
+export const keyFromHash = () => {
+  const m = (window.location.hash || "").match(/^#\/(\w+)/);
+  return m && destinations[m[1]] ? m[1] : null;
+};
+
+export const setHashForDestination = (key) => {
+  const target = `#/${key}`;
+  if (window.location.hash !== target) {
+    history.pushState(null, "", target);
+  }
+};
+
 let loaderPromise = null;
 export const getGltfLoader = async () => {
   if (!loaderPromise) {
