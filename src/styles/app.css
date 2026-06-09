@@ -2338,13 +2338,13 @@ h3 {
 
 /* ── Zone Status Dots ──────────────────────── */
 
-.open-world-shell[data-zone="projects"] .status-dot { background: #4fc3f7; }
-.open-world-shell[data-zone="posts"] .status-dot { background: #ffab40; }
-.open-world-shell[data-zone="experiences"] .status-dot { background: #6de2bc; }
+.open-world-shell[data-zone="projects"] .status-dot { background: #ff6b35; }
+.open-world-shell[data-zone="posts"] .status-dot { background: #00e5ff; }
+.open-world-shell[data-zone="experiences"] .status-dot { background: #7dffb3; }
 
-.open-world-shell[data-zone="projects"] .world-minimap { border-color: rgba(79, 195, 247, 0.3); }
-.open-world-shell[data-zone="posts"] .world-minimap { border-color: rgba(255, 171, 64, 0.3); }
-.open-world-shell[data-zone="experiences"] .world-minimap { border-color: rgba(109, 226, 188, 0.3); }
+.open-world-shell[data-zone="projects"] .world-minimap { border-color: rgba(255, 107, 53, 0.3); }
+.open-world-shell[data-zone="posts"] .world-minimap { border-color: rgba(0, 229, 255, 0.3); }
+.open-world-shell[data-zone="experiences"] .world-minimap { border-color: rgba(125, 255, 179, 0.3); }
 
 /* ── Quick Look Panel ──────────────────────── */
 
@@ -4066,4 +4066,103 @@ a.project-link:hover {
     flex-direction: column;
     gap: 0.2rem;
   }
+}
+
+/* ── Planet world: warp / starmap / arrival / vignette ─────────── */
+.world-warp {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: #020108;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.world-warp.is-active { opacity: 1; pointer-events: auto; }
+.world-warp-canvas { width: 100%; height: 100%; display: block; }
+
+.world-arrival {
+  position: absolute;
+  inset: 0;
+  z-index: 41;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.world-arrival-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--district-accent, #c8b0ff);
+  margin: 0 0 0.4rem;
+}
+.world-arrival-title {
+  font-size: clamp(2rem, 6vw, 3.6rem);
+  letter-spacing: 0.18em;
+  color: #f2eeff;
+  margin: 0;
+  text-shadow: 0 0 28px var(--district-accent-soft, rgba(200, 176, 255, 0.4));
+}
+.world-arrival.is-active .world-arrival-kicker,
+.world-arrival.is-active .world-arrival-title {
+  animation: arrival-in 1.9s ease forwards;
+}
+@keyframes arrival-in {
+  0% { opacity: 0; letter-spacing: 0.5em; }
+  20% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; letter-spacing: 0.14em; }
+}
+
+.world-starmap {
+  position: absolute;
+  inset: 0;
+  z-index: 42;
+  display: grid;
+  place-items: center;
+  background: rgba(4, 2, 14, 0.72);
+  backdrop-filter: blur(6px);
+}
+.world-starmap-card {
+  background: rgba(10, 6, 28, 0.92);
+  border: 1px solid rgba(180, 160, 255, 0.25);
+  border-radius: 16px;
+  padding: 1.4rem;
+  width: min(540px, calc(100vw - 2rem));
+}
+.world-starmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+.world-starmap-dest {
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(180, 160, 255, 0.18);
+  background: rgba(16, 10, 40, 0.6);
+  color: #e8e2ff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.world-starmap-dest:hover,
+.world-starmap-dest:focus-visible { border-color: var(--district-accent, #c8b0ff); transform: translateY(-2px); }
+.world-starmap-dest[data-current="true"] { outline: 1px solid var(--district-accent, #c8b0ff); opacity: 0.65; cursor: default; }
+.world-starmap-dest .dest-name { font-weight: 700; letter-spacing: 0.06em; }
+.world-starmap-dest .dest-sub { font-size: 0.72rem; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.18em; }
+.world-starmap-dest .dest-progress { font-size: 0.7rem; opacity: 0.8; }
+
+.world-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(2, 1, 8, 0.42) 100%);
+}
+@media (max-width: 640px) {
+  .world-starmap-grid { grid-template-columns: 1fr; }
 }

@@ -43,6 +43,10 @@ const experiencesJson = toJsonScript(experiences);
         <span class="tutorial-key">Click</span>
         <span class="tutorial-label">Click ground to walk there</span>
       </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">M</span>
+        <span class="tutorial-label">Starmap — travel between worlds</span>
+      </div>
     </div>
     <div class="world-tutorial-hints" data-input="touch" hidden>
       <div class="world-tutorial-hint">
@@ -56,6 +60,10 @@ const experiencesJson = toJsonScript(experiences);
       <div class="world-tutorial-hint">
         <span class="tutorial-key">Inspect</span>
         <span class="tutorial-label">Or use the Inspect button below</span>
+      </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">Starmap</span>
+        <span class="tutorial-label">Travel between worlds</span>
       </div>
     </div>
     <p class="world-tutorial-dismiss">Press any key or tap to begin</p>
@@ -71,6 +79,34 @@ const experiencesJson = toJsonScript(experiences);
 
   <!-- Zone transition flash -->
   <div class="world-zone-flash" id="world-zone-flash" aria-hidden="true"></div>
+
+  <!-- Warp transition overlay -->
+  <div class="world-warp" id="world-warp" hidden aria-hidden="true">
+    <canvas class="world-warp-canvas" id="world-warp-canvas"></canvas>
+  </div>
+
+  <!-- Arrival title splash -->
+  <div class="world-arrival" id="world-arrival" hidden aria-hidden="true">
+    <p class="world-arrival-kicker" id="world-arrival-kicker"></p>
+    <h2 class="world-arrival-title" id="world-arrival-title"></h2>
+  </div>
+
+  <!-- Starmap overlay -->
+  <div class="world-starmap" id="world-starmap" hidden aria-hidden="true">
+    <article class="world-starmap-card" role="dialog" aria-modal="true" aria-label="Starmap">
+      <button id="world-starmap-close" class="world-modal-close" type="button" aria-label="Close starmap">&times; Close</button>
+      <p class="world-modal-meta">STARMAP</p>
+      <div class="world-starmap-grid" id="world-starmap-grid">
+        <button class="world-starmap-dest" type="button" data-dest="home"><span class="dest-name">Nexus Station</span><span class="dest-sub">Orbital Hub</span><span class="dest-progress" data-progress></span></button>
+        <button class="world-starmap-dest" type="button" data-dest="projects"><span class="dest-name">Forge</span><span class="dest-sub">Stellar Foundry</span><span class="dest-progress" data-progress></span></button>
+        <button class="world-starmap-dest" type="button" data-dest="posts"><span class="dest-name">Signal</span><span class="dest-sub">Relay World</span><span class="dest-progress" data-progress></span></button>
+        <button class="world-starmap-dest" type="button" data-dest="experiences"><span class="dest-name">Grove</span><span class="dest-sub">Living Archive</span><span class="dest-progress" data-progress></span></button>
+      </div>
+    </article>
+  </div>
+
+  <!-- Vignette -->
+  <div class="world-vignette" aria-hidden="true"></div>
 
   <canvas id="open-world-canvas" class="open-world-canvas" aria-label="Open World Portfolio"></canvas>
 
@@ -94,6 +130,7 @@ const experiencesJson = toJsonScript(experiences);
       <div class="hud-toggles">
         <button class="hud-btn hud-btn-ghost" id="world-camera-mode" type="button">Cam: Isometric</button>
         <button class="hud-btn hud-btn-ghost" id="world-quality-mode" type="button">Quality: Auto</button>
+        <button class="hud-btn hud-btn-ghost" id="world-starmap-btn" type="button">Starmap [M]</button>
         <button class="hud-btn hud-btn-ghost hud-btn-help-toggle" id="world-help-toggle" type="button">?</button>
       </div>
       <div class="hud-help-panel" id="world-help-panel" hidden>
