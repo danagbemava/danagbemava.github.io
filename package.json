@@ -11,7 +11,8 @@
     "sync-assets:dry": "node scripts/download-world-assets.mjs --dry-run",
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "test:world": "node scripts/world-smoke.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
