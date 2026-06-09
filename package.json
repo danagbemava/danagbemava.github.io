@@ -12,7 +12,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "test:world": "node scripts/world-smoke.mjs"
+    "test:world": "node scripts/world-smoke.mjs",
+    "test:experiments": "node scripts/experiments-smoke.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
