@@ -39,88 +39,66 @@ export const getHudElements = () => {
   els.loadingHint = document.getElementById("world-loading-hint");
   els.zoneFlash = document.getElementById("world-zone-flash");
   els.minimapCanvas = document.getElementById("world-minimap");
+  els.warp = document.getElementById("world-warp");
+  els.warpCanvas = document.getElementById("world-warp-canvas");
+  els.arrival = document.getElementById("world-arrival");
+  els.arrivalKicker = document.getElementById("world-arrival-kicker");
+  els.arrivalTitle = document.getElementById("world-arrival-title");
+  els.starmap = document.getElementById("world-starmap");
+  els.starmapGrid = document.getElementById("world-starmap-grid");
+  els.starmapClose = document.getElementById("world-starmap-close");
+  els.starmapBtn = document.getElementById("world-starmap-btn");
 
   return els;
 };
 
 /**
- * Creates the minimap drawing function.
+ * Minimap: radar of the CURRENT scene. Caller passes POIs each draw:
+ * { entries: [{x,z}], gates: [{x,z,accent}], landmark: {x,z}|null,
+ *   boundsRadius, accent }
  */
 export const createMinimap = (minimapCanvas) => {
   const ctx = minimapCanvas ? minimapCanvas.getContext("2d") : null;
-
-  // Colors match districtConfig in open-world-config.js
-  const districts = [
-    { name: "home", x: 0, z: 0, color: "#c8b0ff" },
-    { name: "projects", x: -38, z: 0, color: "#ff6b35" },
-    { name: "posts", x: 38, z: 0, color: "#00e5ff" },
-    { name: "experiences", x: 0, z: -38, color: "#7dffb3" }
-  ];
-  const labels = { home: "H", projects: "P", posts: "S", experiences: "E" };
-
-  return (playerPos, zone) => {
+  return (playerPos, pois) => {
     if (!ctx || !minimapCanvas) return;
     const w = minimapCanvas.width;
     const h = minimapCanvas.height;
     const cx = w / 2;
     const cy = h / 2;
-    const scale = 1.25;
+    const scale = (cx - 8) / pois.boundsRadius;
 
     ctx.clearRect(0, 0, w, h);
-
     ctx.beginPath();
     ctx.arc(cx, cy, cx - 2, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(5, 10, 18, 0.7)";
     ctx.fill();
-
-    for (const d of districts) {
-      const dx = (d.x - playerPos.x) * scale + cx;
-      const dy = (d.z - playerPos.z) * scale + cy;
-      if (dx < -10 || dx > w + 10 || dy < -10 || dy > h + 10) {
-        const angle = Math.atan2(dy - cy, dx - cx);
-        const edgeR = cx - 10;
-        const ex = cx + Math.cos(angle) * edgeR;
-        const ey = cy + Math.sin(angle) * edgeR;
-        ctx.beginPath();
-        ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = d.name === zone ? d.color : "rgba(120, 180, 220, 0.3)";
-        ctx.fill();
-      } else {
-        const isActive = d.name === zone;
-        const r = isActive ? 7 : 5;
-        ctx.beginPath();
-        ctx.arc(dx, dy, r, 0, Math.PI * 2);
-        ctx.fillStyle = isActive ? d.color : "rgba(120, 180, 220, 0.25)";
-        ctx.fill();
-        if (isActive) {
-          ctx.beginPath();
-          ctx.arc(dx, dy, r + 3, 0, Math.PI * 2);
-          ctx.strokeStyle = d.color;
-          ctx.globalAlpha = 0.35;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
-        ctx.fillStyle = isActive ? "#fff" : "rgba(200, 225, 245, 0.55)";
-        ctx.font = `${isActive ? "700" : "600"} ${isActive ? 8 : 7}px Sora, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(labels[d.name] || "", dx, dy);
-      }
-    }
-
-    // Player dot
     ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#fff";
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+    ctx.arc(cx, cy, pois.boundsRadius * scale, 0, Math.PI * 2);
+    ctx.strokeStyle = `${pois.accent}44`;
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Compass N
+    const plot = (x, z) => ({ px: cx + x * scale, py: cy + z * scale });
+
+    for (const e of pois.entries) {
+      const { px, py } = plot(e.x, e.z);
+      ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(200, 225, 245, 0.5)"; ctx.fill();
+    }
+    if (pois.landmark) {
+      const { px, py } = plot(pois.landmark.x, pois.landmark.z);
+      ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = pois.accent; ctx.fill();
+    }
+    for (const g of pois.gates) {
+      const { px, py } = plot(g.x, g.z);
+      ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2);
+      ctx.strokeStyle = g.accent; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    const { px, py } = plot(playerPos.x, playerPos.z);
+    ctx.beginPath(); ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff"; ctx.fill();
+
     ctx.fillStyle = "rgba(200, 225, 245, 0.5)";
     ctx.font = "600 8px Sora, sans-serif";
     ctx.textAlign = "center";

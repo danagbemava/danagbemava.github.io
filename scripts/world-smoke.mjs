@@ -50,6 +50,19 @@ try {
   await page.keyboard.up("w");
   await page.waitForTimeout(500);
 
+  // ── Warp via starmap to each planet and back ──
+  for (const dest of ["projects", "posts", "experiences", "home"]) {
+    await page.click("#world-starmap-btn");
+    await page.click(`.world-starmap-dest[data-dest="${dest}"]`);
+    await page.waitForTimeout(3500); // warp completes in ~2.2s
+    const hash = await page.evaluate(() => window.location.hash);
+    if (hash !== `#/${dest}`) fail(`expected hash #/${dest}, got ${hash}`);
+    const label = await page.$eval("#world-zone-label", (el) => el.textContent);
+    const expected = { home: "NEXUS STATION", projects: "FORGE", posts: "SIGNAL", experiences: "GROVE" }[dest];
+    if (!label.includes(expected)) fail(`expected zone label ${expected}, got ${label}`);
+    await page.screenshot({ path: `/tmp/world-smoke-${dest}.png` });
+  }
+
   if (errors.length) fail(`runtime errors:\n${errors.join("\n")}`);
   await page.screenshot({ path: "/tmp/world-smoke-hub.png" });
   console.log(process.exitCode ? "SMOKE FAILED" : "SMOKE PASSED");

@@ -247,6 +247,8 @@ export const markSecretFound = (secretKey) => {
   return true;
 };
 
+export const getSecretsFound = () => ({ ...loadState().discoveredSecrets });
+
 export const zoneLabel = (zone) => zoneLabels[zone] || zone;
 
 window.addEventListener("beforeunload", () => {

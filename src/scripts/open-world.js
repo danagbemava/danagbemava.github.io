@@ -11,9 +11,12 @@ import {
   playSecretFound,
   primeAudio,
   playHolodeckActivate,
-  playHolodeckDeactivate
+  playHolodeckDeactivate,
+  playWarpCharge,
+  playWarpTunnel,
+  playArrival
 } from "./sfx.js";
-import { getWorldSnapshot, registerVisit, markInteraction, markSecretFound } from "./world-state.js";
+import { getWorldSnapshot, registerVisit, markInteraction, markSecretFound, getSecretsFound } from "./world-state.js";
 import { startWorldEvents } from "./world-events.js";
 import {
   clamp,
@@ -22,14 +25,12 @@ import {
   safeAudio,
   parseJsonNode,
   summarizeExperience,
-  districtConfig,
-  districtAtmosphere,
-  districtPresentation,
-  getStartPosition
+  destinations,
+  keyFromHash,
+  setHashForDestination
 } from "./open-world-config.js";
-import { createEnvironment, updateEnvironment } from "./open-world-environment.js";
-import { createDistricts, updateDistricts } from "./open-world-districts.js";
-import { createEntries } from "./open-world-entries.js";
+import { createSceneManager } from "./open-world-scenes.js";
+import { createWarpController, createStarmap } from "./open-world-travel.js";
 import { createPlayer, updatePlayer } from "./open-world-player.js";
 import { getHudElements, createMinimap, createQuickLook } from "./open-world-hud.js";
 
@@ -58,7 +59,7 @@ const bootOpenWorld = () => {
     quicklookTitle: quickLookTitle, quicklookSummary: quickLookSummary,
     quicklookCanvas: quickLookCanvas,
     detail: detailEl, detailClose, detailMeta, detailTitle, detailSummary, detailLink,
-    sprintBadge, helpToggle, helpPanel, loadingEl, loadingHint, zoneFlash, minimapCanvas
+    sprintBadge, helpToggle, helpPanel, loadingEl, loadingHint, minimapCanvas
   } = els;
 
   // ── Tutorial & Secret Reward elements ───────────────────────────
@@ -68,8 +69,6 @@ const bootOpenWorld = () => {
   const secretRewardText = document.getElementById("world-secret-reward-text");
 
   // ── Loading helpers ────────────────────────────────────────────
-  let loadingAssetsRemaining = 0;
-  let loadingAssetsTotal = 0;
   const updateLoadingHint = (text) => { if (loadingHint) loadingHint.textContent = text; };
   const dismissLoading = () => { if (loadingEl) loadingEl.classList.add("is-hidden"); };
 
@@ -77,41 +76,30 @@ const bootOpenWorld = () => {
   if (helpToggle && helpPanel) {
     helpToggle.addEventListener("click", () => {
       helpPanel.hidden = !helpPanel.hidden;
-      helpToggle.textContent = helpPanel.hidden ? "?" : "\u2715";
+      helpToggle.textContent = helpPanel.hidden ? "?" : "✕";
     });
   }
 
-  // ── Zone flash ─────────────────────────────────────────────────
-  let prevZone = shell.dataset.startZone || "home";
-  const triggerZoneFlash = () => {
-    if (!zoneFlash) return;
-    zoneFlash.classList.remove("is-active");
-    void zoneFlash.offsetWidth;
-    zoneFlash.classList.add("is-active");
-  };
-
   // ── Data ───────────────────────────────────────────────────────
-  const projects = parseJsonNode("world-data-projects");
-  const posts = parseJsonNode("world-data-posts");
-  const experiences = parseJsonNode("world-data-experiences");
+  const content = {
+    projects: parseJsonNode("world-data-projects"),
+    posts: parseJsonNode("world-data-posts"),
+    experiences: parseJsonNode("world-data-experiences")
+  };
 
   // ── Platform ───────────────────────────────────────────────────
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isTouch = window.matchMedia("(pointer: coarse)").matches;
   const lowPower = prefersReducedMotion || isTouch;
-
-  // Tutorial / help copy comes in keyboard and touch flavors.
-  for (const el of shell.querySelectorAll("[data-input]")) {
-    el.hidden = el.dataset.input !== (isTouch ? "touch" : "keyboard");
-  }
   const dprCap = lowPower ? 1 : 1.4;
   let cameraMode = "isometric";
   let qualityMode = "auto";
   let adaptiveQuality = lowPower ? 0 : 1;
 
-  const startZone = shell.dataset.startZone || "home";
-  registerVisit(startZone);
-  let snapshot = getWorldSnapshot(startZone);
+  // Tutorial / help copy comes in keyboard and touch flavors.
+  for (const el of shell.querySelectorAll("[data-input]")) {
+    el.hidden = el.dataset.input !== (isTouch ? "touch" : "keyboard");
+  }
 
   // ── Renderer & Scene ───────────────────────────────────────────
   let renderer;
@@ -143,9 +131,9 @@ const bootOpenWorld = () => {
   scene.background = new THREE.Color(0x08041a);
   scene.fog = new THREE.FogExp2(0x0a0520, lowPower ? 0.01 : 0.008);
 
-  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 320);
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 520);
 
-  // ── Lights (nebula-tuned) ──────────────────────────────────────
+  // ── Lights ─────────────────────────────────────────────────────
   const ambient = new THREE.AmbientLight(0x8878b8, lowPower ? 0.9 : 1.05);
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xd8c0ff, lowPower ? 0.7 : 1.0);
@@ -154,7 +142,7 @@ const bootOpenWorld = () => {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     // The default directional shadow camera is a ±5 unit box; size it to
-    // cover the playable area (islands span roughly ±68 units).
+    // cover the playable area.
     sun.shadow.camera.left = -85;
     sun.shadow.camera.right = 85;
     sun.shadow.camera.top = 85;
@@ -170,39 +158,34 @@ const bootOpenWorld = () => {
   rim.position.set(-18, 14, -22);
   scene.add(rim);
 
-  // ── Build world ────────────────────────────────────────────────
-  const env = createEnvironment(scene, lowPower);
-
+  // ── Scene manager & initial destination ────────────────────────
+  let assetResolve = null;
+  let assetsRemaining = 0;
+  const beginAssetWait = (count) => new Promise((resolve) => {
+    assetsRemaining = count;
+    assetResolve = resolve;
+    if (count === 0) { resolve(); assetResolve = null; }
+  });
   const onAssetLoaded = () => {
-    loadingAssetsRemaining -= 1;
-    if (loadingAssetsRemaining <= 0) {
-      updateLoadingHint("Ready");
-      setTimeout(() => { dismissLoading(); showTutorialIfNew(); }, 300);
-    } else {
-      updateLoadingHint(`Loading models (${loadingAssetsTotal - loadingAssetsRemaining}/${loadingAssetsTotal})`);
-    }
+    assetsRemaining -= 1;
+    if (assetsRemaining <= 0 && assetResolve) { assetResolve(); assetResolve = null; }
   };
 
-  updateLoadingHint("Loading district models");
-  const districts = createDistricts(scene, lowPower, onAssetLoaded);
-  loadingAssetsTotal = districts.assetCount + 1; // +1 for avatar
-  loadingAssetsRemaining = loadingAssetsTotal;
-  if (districts.assetCount === 0) setTimeout(dismissLoading, 400);
+  const sceneManager = createSceneManager({ scene, content, lowPower, lights: { ambient, rim } });
 
-  const entries = createEntries(scene, projects, posts, experiences, lowPower);
-  const worldBlockers = [...entries.blockers, ...districts.blockers];
+  const startKey = keyFromHash() || shell.dataset.startZone || "home";
+  updateLoadingHint("Building world");
+  let pack = sceneManager.swap(startKey, onAssetLoaded);
+  const initialAssets = beginAssetWait(pack.assetCount + 1); // +1 avatar
+  registerVisit(startKey);
+  setHashForDestination(startKey);
+  let snapshot = getWorldSnapshot(startKey);
 
-  // Collected once here instead of scene.traverse-ing every frame in the
-  // render loop (bob targets are all created synchronously above).
-  const bobbers = [];
-  scene.traverse((obj) => {
-    if (obj.userData.bobOrigin !== undefined) bobbers.push(obj);
-  });
+  const dest = () => sceneManager.destination;
 
   // ── Player ─────────────────────────────────────────────────────
-  const startPos = getStartPosition(startZone);
-  const playerObj = createPlayer(scene, startPos, isTouch, lowPower);
-
+  const spawn = dest().spawn;
+  const playerObj = createPlayer(scene, new THREE.Vector3(spawn.x, 0, spawn.z), isTouch, lowPower);
   updateLoadingHint("Loading avatar");
   playerObj.loadAvatar(() => onAssetLoaded());
 
@@ -237,6 +220,11 @@ const bootOpenWorld = () => {
     try { window.localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch { /* ignore */ }
   };
 
+  initialAssets.then(() => {
+    updateLoadingHint("Ready");
+    setTimeout(() => { dismissLoading(); showTutorialIfNew(); }, 300);
+  });
+
   // ── Secret reward payoff ───────────────────────────────────────
   const secretRewards = {
     sky_shard: { title: "Sky Shard Recovered", text: "A fragment from beyond the nebula veil. The grove remembers." },
@@ -252,7 +240,6 @@ const bootOpenWorld = () => {
     secretRewardText.textContent = reward.text;
     secretRewardEl.hidden = false;
     secretRewardEl.setAttribute("aria-hidden", "false");
-    // Reset animation
     secretRewardEl.style.animation = "none";
     void secretRewardEl.offsetWidth;
     secretRewardEl.style.animation = "";
@@ -267,13 +254,13 @@ const bootOpenWorld = () => {
   // ── Interaction state ──────────────────────────────────────────
   let nearby = null;
   let nearbyLandmark = null;
+  let nearbyGate = null;
   let landmarkCooldown = 0;
   let objectiveFlash = 0;
   let modalOpen = false;
   let ambientStarted = false;
   let rafId = null;
   let worldTicker = 0;
-  let currentZone = "home";
   let hoverEntry = null;
   let moveTarget = null;
   let pointerMoved = false;
@@ -285,8 +272,9 @@ const bootOpenWorld = () => {
   let appliedQualityTier = null;
   let lastFocused = null;
   const activatedBeacons = new Set();
-  const beaconTotal = districts.districtLandmarks.length;
-  const secretTotal = entries.secretNodes.length;
+  const secretKeyByDest = { projects: "data_shard", posts: "timeline_echo", experiences: "sky_shard" };
+  const beaconTotal = Object.keys(secretKeyByDest).length;
+  const secretTotal = Object.keys(secretKeyByDest).length;
 
   const setText = (el, value) => {
     if (el && el.__lastText !== value) {
@@ -309,14 +297,73 @@ const bootOpenWorld = () => {
   const isometricOffset = new THREE.Vector3(15, isTouch ? 15 : 14, 15);
   const followOffset = new THREE.Vector3(0, isTouch ? 8.5 : 7.2, isTouch ? 14.5 : 12);
 
+  // Bob targets are re-collected after every scene swap.
+  const bobbers = [];
+  const refreshSceneCaches = () => {
+    bobbers.length = 0;
+    pack.group.traverse((o) => {
+      if (o.userData.bobOrigin !== undefined) bobbers.push(o);
+    });
+  };
+  refreshSceneCaches();
+
   // ── Minimap & QuickLook ────────────────────────────────────────
   const drawMinimap = createMinimap(minimapCanvas);
   const quickLook = createQuickLook(quickLookCanvas);
 
+  // ── Travel ─────────────────────────────────────────────────────
+  const performSwap = (key) => {
+    pack = sceneManager.swap(key, onAssetLoaded);
+    const ready = beginAssetWait(pack.assetCount);
+    const s = destinations[key].spawn;
+    playerObj.player.position.set(s.x, 0, s.z);
+    velocity.set(0, 0, 0);
+    moveTarget = null;
+    nearby = null;
+    nearbyGate = null;
+    nearbyLandmark = null;
+    hoverEntry = null;
+    refreshSceneCaches();
+    registerVisit(key);
+    snapshot = getWorldSnapshot(key);
+    return ready;
+  };
+
+  const warp = createWarpController({
+    els: {
+      warp: els.warp, warpCanvas: els.warpCanvas, arrival: els.arrival,
+      arrivalKicker: els.arrivalKicker, arrivalTitle: els.arrivalTitle
+    },
+    performSwap,
+    sounds: {
+      charge: () => safeAudio(() => playWarpCharge()),
+      tunnel: () => safeAudio(() => playWarpTunnel()),
+      arrival: () => safeAudio(() => playArrival())
+    }
+  });
+
+  const starmap = createStarmap({
+    els: { starmap: els.starmap, starmapGrid: els.starmapGrid, starmapClose: els.starmapClose },
+    getCurrentKey: () => sceneManager.key,
+    getProgress: (key) => ({
+      beacon: activatedBeacons.has(key),
+      secret: Boolean(getSecretsFound()[secretKeyByDest[key]])
+    }),
+    onPick: (key) => warp.warpTo(key)
+  });
+  const onStarmapBtn = () => starmap.toggle();
+  els.starmapBtn.addEventListener("click", onStarmapBtn);
+
+  const onHashChange = () => {
+    const key = keyFromHash();
+    if (key && key !== sceneManager.key && !warp.warping) warp.warpTo(key);
+  };
+  window.addEventListener("hashchange", onHashChange);
+
   // ── World events ───────────────────────────────────────────────
   const stopWorldEvents = startWorldEvents({
-    zone: startZone,
-    getZone: () => currentZone,
+    zone: startKey,
+    getZone: () => sceneManager.key,
     sound: !isMuted(),
     minDelayMs: 18000,
     maxDelayMs: 32000,
@@ -365,7 +412,7 @@ const bootOpenWorld = () => {
     objectiveFlash = 2.4;
     activatedBeacons.add(landmark.zone);
     markInteraction(1.4);
-    snapshot = getWorldSnapshot(currentZone);
+    snapshot = getWorldSnapshot(sceneManager.key);
     detailTitle.textContent = landmark.title;
     detailMeta.textContent = `${landmark.zone.toUpperCase()} LANDMARK`;
     detailEl.dataset.kind = landmark.zone;
@@ -394,6 +441,7 @@ const bootOpenWorld = () => {
   };
 
   const tryInspect = () => {
+    if (nearbyGate && !warp.warping) { warp.warpTo(nearbyGate.key); return; }
     if (nearbyLandmark) { activateLandmark(nearbyLandmark); return; }
     if (nearby) { openEntry(nearby); return; }
     safeAudio(() => playBeep());
@@ -425,7 +473,11 @@ const bootOpenWorld = () => {
     if (event.key === "Shift") controls.run = true;
     if (event.code === "Space") controls.jumpQueued = true;
     if (key === "e") tryInspect();
-    if (event.key === "Escape") closeEntry();
+    if (key === "m") { starmap.toggle(); return; }
+    if (event.key === "Escape") {
+      if (starmap.isOpen) { starmap.hide(); return; }
+      closeEntry();
+    }
     if (!ambientStarted) {
       ambientStarted = true;
       safeAudio(() => startAmbient("/models/ambient-drone.wav"));
@@ -463,9 +515,11 @@ const bootOpenWorld = () => {
     pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointerNdc, camera);
     if (raycaster.ray.intersectPlane(groundPlane, clickPoint)) {
-      moveTarget = new THREE.Vector3(
-        clamp(clickPoint.x, -66, 66), 0, clamp(clickPoint.z, -66, 28)
-      );
+      const r = dest().boundsRadius;
+      const len = Math.hypot(clickPoint.x, clickPoint.z);
+      moveTarget = len > r
+        ? new THREE.Vector3(clickPoint.x * r / len, 0, clickPoint.z * r / len)
+        : new THREE.Vector3(clickPoint.x, 0, clickPoint.z);
     }
   };
 
@@ -478,7 +532,7 @@ const bootOpenWorld = () => {
     }
     pointerMoved = false;
     pointerDownAt = { x: event.clientX, y: event.clientY };
-    if (isTouch && (nearby || nearbyLandmark) && !modalOpen) tryInspect();
+    if (isTouch && (nearby || nearbyLandmark || nearbyGate) && !modalOpen) tryInspect();
   };
 
   const onPointerMove = (event) => {
@@ -486,7 +540,7 @@ const bootOpenWorld = () => {
     pointerNdc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     pointerNdc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(pointerNdc, camera);
-    const hits = raycaster.intersectObjects(entries.entryMeshes, true);
+    const hits = raycaster.intersectObjects(pack.entryMeshes, true);
     hoverEntry = hits.length > 0 ? findEntryRoot(hits[0].object) : null;
     if (!pointerDownAt) return;
     const dx = event.clientX - pointerDownAt.x;
@@ -499,8 +553,8 @@ const bootOpenWorld = () => {
     const moved = pointerMoved;
     pointerDownAt = null;
     pointerMoved = false;
-    if (moved || modalOpen) return;
-    if (isTouch && (nearby || nearbyLandmark)) return;
+    if (moved || modalOpen || warp.warping || starmap.isOpen) return;
+    if (isTouch && (nearby || nearbyLandmark || nearbyGate)) return;
     setMoveTargetFromPointer(event);
   };
 
@@ -512,6 +566,12 @@ const bootOpenWorld = () => {
       return;
     }
     if (!rafId) rafId = requestAnimationFrame(tick);
+  };
+
+  const getEffectiveQualityTier = () => {
+    if (qualityMode === "low") return 0;
+    if (qualityMode === "high") return 2;
+    return adaptiveQuality;
   };
 
   // Pixel ratio is the biggest perf lever, so it scales with quality tier.
@@ -535,12 +595,6 @@ const bootOpenWorld = () => {
 
   const applyCameraModeText = () => {
     cameraModeBtn.textContent = cameraMode === "isometric" ? "Cam: Isometric" : "Cam: Follow";
-  };
-
-  const getEffectiveQualityTier = () => {
-    if (qualityMode === "low") return 0;
-    if (qualityMode === "high") return 2;
-    return adaptiveQuality;
   };
 
   const applyQualityText = () => {
@@ -584,18 +638,28 @@ const bootOpenWorld = () => {
       }
     }
 
+    const qualityTier = getEffectiveQualityTier();
+    if (qualityTier !== appliedQualityTier) {
+      appliedQualityTier = qualityTier;
+      onResize();
+    }
+
+    const traveling = warp.warping;
+    const inputLocked = modalOpen || traveling || starmap.isOpen;
+
     // Player physics
-    const running = controls.run && !modalOpen;
+    const running = controls.run && !inputLocked;
     const playerResult = updatePlayer({
-      player: playerObj.player, controls, velocity, desired, blockers: worldBlockers,
-      camera, moveTarget, modalOpen, running, lowPower, playerObj
+      player: playerObj.player, controls, velocity, desired, blockers: pack.blockers,
+      camera, moveTarget, modalOpen: inputLocked, running, lowPower, playerObj,
+      boundsRadius: dest().boundsRadius
     }, dt, worldTicker);
 
     moveTarget = playerResult.moveTarget;
     const onGround = playerResult.onGround;
 
     // Audio footsteps
-    if (!modalOpen) {
+    if (!inputLocked) {
       if (playerResult.moving && onGround) {
         safeAudio(() => updateFootsteps(Math.hypot(velocity.x, velocity.z) * dt));
       } else {
@@ -603,11 +667,8 @@ const bootOpenWorld = () => {
       }
     }
 
-    // Environment animation
-    updateEnvironment(env, dt, worldTicker);
-
-    // District animation
-    updateDistricts(districts, dt, worldTicker, currentZone);
+    // Scene pack + backdrop animation
+    sceneManager.update(dt, worldTicker);
 
     // Bobbing spores/orbs
     for (const obj of bobbers) {
@@ -616,12 +677,10 @@ const bootOpenWorld = () => {
     }
 
     // Secret node collection
-    for (const secret of entries.secretNodes) {
+    for (const secret of pack.secretNodes) {
       if (!secret.mesh.parent) continue;
-      secret.mesh.rotation.y += dt * 2.8;
-      secret.mesh.position.y = secret.pos.y + Math.sin(worldTicker * 2.4) * 0.28;
       if (playerObj.player.position.distanceTo(secret.mesh.position) < 1.4) {
-        scene.remove(secret.mesh);
+        secret.mesh.removeFromParent();
         secret.mesh.geometry.dispose();
         secret.mesh.material.dispose();
         if (markSecretFound(secret.key)) {
@@ -632,81 +691,83 @@ const bootOpenWorld = () => {
       }
     }
 
-    // Zone detection
-    const zoneDistances = Object.entries(districtConfig).map(([name, cfg]) => ({
-      name,
-      distance: Math.hypot(playerObj.player.position.x - cfg.center.x, playerObj.player.position.z - cfg.center.z)
-    }));
-    zoneDistances.sort((a, b) => a.distance - b.distance);
-    currentZone = zoneDistances[0]?.name || "home";
-    snapshot = getWorldSnapshot(currentZone);
+    snapshot = getWorldSnapshot(sceneManager.key);
 
     // HUD update (setText skips writes when nothing changed)
-    setText(zoneLabel, districtConfig[currentZone].title);
-    const profile = districtPresentation[currentZone] || districtPresentation.home;
-    setText(zoneBlurb, profile.blurb);
+    const d = dest();
+    setText(zoneLabel, d.title);
+    setText(zoneBlurb, d.blurb);
     const objectiveText = objectiveFlash > 0
-      ? `Beacon activated (${activatedBeacons.size}/${beaconTotal}). Explore another district.`
+      ? `Beacon activated (${activatedBeacons.size}/${beaconTotal}). Explore another world.`
       : (activatedBeacons.size >= beaconTotal
         ? "All beacons active. Hunt down the remaining secret shards."
-        : profile.objective);
+        : d.objective);
     setText(objectiveEl, objectiveText);
     setText(energyVal, `${Math.round(snapshot.energyLevel * 100)}%`);
     setText(secretsVal, `${snapshot.secretsFound}/${secretTotal}`);
     setText(visitsVal, String(snapshot.totalVisits));
     if (sprintBadge) sprintBadge.hidden = !controls.run;
 
-    // Zone transition
-    if (currentZone !== prevZone) {
-      triggerZoneFlash();
-      prevZone = currentZone;
-    }
+    shell.dataset.zone = sceneManager.key;
+    shell.style.setProperty("--district-accent", colorToHex(d.accent));
+    shell.style.setProperty("--district-accent-soft", d.accentSoft);
 
-    shell.dataset.zone = currentZone;
-    shell.style.setProperty("--district-accent", colorToHex(profile.accent));
-    shell.style.setProperty("--district-accent-soft", profile.accentSoft);
-
-    // Atmosphere transition
-    const atmos = districtAtmosphere[currentZone] || districtAtmosphere.home;
-    scene.background.lerp(new THREE.Color(atmos.bg), Math.min(1, dt * 1.6));
-    scene.fog.color.lerp(new THREE.Color(atmos.fog), Math.min(1, dt * 1.8));
-    scene.fog.density += (atmos.fogDensity - scene.fog.density) * Math.min(1, dt * 2.2);
-    ambient.intensity += (atmos.ambient - ambient.intensity) * Math.min(1, dt * 2.2);
-    rim.intensity += (atmos.rim - rim.intensity) * Math.min(1, dt * 2.2);
+    // Soft sun pulse tied to world energy.
     const lightBeat = Math.sin(worldTicker * 2.8 + snapshot.energyLevel * 5) * 0.5 + 0.5;
     sun.intensity = lerp(sun.intensity, (lowPower ? 0.58 : 0.82) + lightBeat * 0.24, Math.min(1, dt * 3.2));
-    env.ground.material.color.lerp(new THREE.Color(atmos.fog), Math.min(1, dt * 0.8));
-    env.terrainRing.material.color.lerp(new THREE.Color(atmos.bg), Math.min(1, dt * 0.5));
-    env.skyDome.material.color.lerp(new THREE.Color(atmos.fog), Math.min(1, dt * 0.28));
 
-    // Proximity detection
+    // Proximity detection: gates take priority, then landmark, then entries.
+    let nearestGate = null;
+    let nearestGateDist = Infinity;
+    for (const gate of pack.gates) {
+      const gd = Math.hypot(
+        playerObj.player.position.x - gate.root.position.x,
+        playerObj.player.position.z - gate.root.position.z
+      );
+      if (gd < nearestGateDist) { nearestGateDist = gd; nearestGate = gate; }
+      gate.setCharge(0);
+    }
+
     let nearest = null;
     let nearestDist = Infinity;
-    for (const mesh of entries.entryMeshes) {
+    for (const mesh of pack.entryMeshes) {
       const dist = Math.hypot(playerObj.player.position.x - mesh.position.x, playerObj.player.position.z - mesh.position.z);
       if (dist < nearestDist) { nearestDist = dist; nearest = mesh; }
     }
 
-    let nearestLandmark = null;
-    let nearestLandmarkDist = Infinity;
-    for (const landmark of districts.districtLandmarks) {
-      const dist = Math.hypot(playerObj.player.position.x - landmark.root.position.x, playerObj.player.position.z - landmark.root.position.z);
-      if (dist < nearestLandmarkDist) { nearestLandmarkDist = dist; nearestLandmark = landmark; }
+    let landmarkDist = Infinity;
+    if (pack.landmark) {
+      landmarkDist = Math.hypot(
+        playerObj.player.position.x - pack.landmark.root.position.x,
+        playerObj.player.position.z - pack.landmark.root.position.z
+      );
     }
 
-    const landmarkActive = nearestLandmark && nearestLandmarkDist < nearestLandmark.radius;
     let interactionProximity = 0;
 
-    if (landmarkActive) {
+    if (nearestGate && nearestGateDist < nearestGate.radius && !traveling) {
+      nearbyGate = nearestGate;
       nearby = null;
-      nearbyLandmark = nearestLandmark;
+      nearbyLandmark = null;
+      nearestGate.setCharge(clamp(1 - nearestGateDist / nearestGate.radius, 0, 1));
       promptEl.hidden = false;
-      setText(promptText, `Activate landmark: ${nearestLandmark.title}`);
+      setText(promptText, nearestGate.title);
+      setText(actionBtn, "Warp");
+      actionBtn.disabled = false;
+      interactionProximity = clamp(1 - nearestGateDist / nearestGate.radius, 0, 1);
+      safeAudio(() => updateProximityHum(interactionProximity));
+    } else if (pack.landmark && landmarkDist < pack.landmark.radius) {
+      nearbyGate = null;
+      nearby = null;
+      nearbyLandmark = pack.landmark;
+      promptEl.hidden = false;
+      setText(promptText, `Activate landmark: ${pack.landmark.title}`);
       setText(actionBtn, landmarkCooldown > 0 ? "Stabilizing..." : "Activate");
       actionBtn.disabled = landmarkCooldown > 0;
-      interactionProximity = clamp(1 - nearestLandmarkDist / nearestLandmark.radius, 0, 1);
+      interactionProximity = clamp(1 - landmarkDist / pack.landmark.radius, 0, 1);
       safeAudio(() => updateProximityHum(interactionProximity));
     } else if (nearest && nearestDist < (nearest.userData.interactionRadius || 4)) {
+      nearbyGate = null;
       nearby = nearest;
       nearbyLandmark = null;
       promptEl.hidden = false;
@@ -716,6 +777,7 @@ const bootOpenWorld = () => {
       interactionProximity = clamp(1 - nearestDist / 4, 0, 1);
       safeAudio(() => updateProximityHum(interactionProximity));
     } else {
+      nearbyGate = null;
       nearby = null;
       nearbyLandmark = null;
       promptEl.hidden = true;
@@ -726,30 +788,21 @@ const bootOpenWorld = () => {
 
     quickLook.show(hoverEntry || nearby, { quickLookEl, quickLookKicker, quickLookTitle, quickLookSummary, modalOpen });
 
-    // Quality-based LOD
-    const qualityTier = getEffectiveQualityTier();
-    if (qualityTier !== appliedQualityTier) {
-      appliedQualityTier = qualityTier;
-      onResize();
-    }
-    const skylineDistance = qualityTier === 0 ? 42 : (qualityTier === 1 ? 58 : 74);
-    const propDistance = qualityTier === 0 ? 30 : (qualityTier === 1 ? 46 : 62);
-    const particleDistance = qualityTier === 0 ? 20 : (qualityTier === 1 ? 30 : 40);
-
-    for (const node of env.skyline) node.visible = node.position.distanceTo(playerObj.player.position) < skylineDistance;
-    for (const prop of districts.districtProps) prop.visible = prop.position.distanceTo(playerObj.player.position) < propDistance;
-    for (const po of districts.particleOrbiters) po.mesh.visible = po.mesh.position.distanceTo(playerObj.player.position) < particleDistance;
-    for (const sr of districts.scanRings) sr.mesh.visible = qualityTier > 0;
-
     // Minimap (every 6 frames)
     minimapFrame += 1;
     if (minimapFrame % 6 === 0) {
-      drawMinimap(playerObj.player.position, currentZone);
+      drawMinimap(playerObj.player.position, {
+        entries: pack.entryMeshes.map((m) => ({ x: m.position.x, z: m.position.z })),
+        gates: pack.gates.map((g) => ({ x: g.root.position.x, z: g.root.position.z, accent: colorToHex(destinations[g.key].accent) })),
+        landmark: pack.landmark ? { x: pack.landmark.root.position.x, z: pack.landmark.root.position.z } : null,
+        boundsRadius: d.boundsRadius + 8,
+        accent: colorToHex(d.accent)
+      });
     }
 
     // Audio profile
     safeAudio(() => setWorldAudioProfile({
-      zone: currentZone,
+      zone: sceneManager.key,
       energy: snapshot.energyLevel,
       proximity: interactionProximity,
       eventBoost: objectiveFlash > 0 ? 0.5 : 0
@@ -801,7 +854,6 @@ const bootOpenWorld = () => {
   applyCameraModeText();
   applyQualityText();
   onResize();
-  drawMinimap(playerObj.player.position, startZone);
   rafId = requestAnimationFrame(tick);
 
   window.dispatchEvent(new CustomEvent("scene-ready"));
@@ -816,6 +868,7 @@ const bootOpenWorld = () => {
     window.removeEventListener("joystick-move", onJoystickMove);
     window.removeEventListener("joystick-sprint", onJoystickSprint);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("hashchange", onHashChange);
     document.removeEventListener("visibilitychange", onVisibilityChange);
     canvas.removeEventListener("pointerdown", onPointerDown);
     canvas.removeEventListener("pointermove", onPointerMove);
@@ -826,6 +879,7 @@ const bootOpenWorld = () => {
     cameraModeBtn.removeEventListener("click", onCameraModeClick);
     qualityModeBtn.removeEventListener("click", onQualityModeClick);
     actionBtn.removeEventListener("click", tryInspect);
+    els.starmapBtn.removeEventListener("click", onStarmapBtn);
 
     stopWorldEvents();
     safeAudio(() => updateProximityHum(0));
