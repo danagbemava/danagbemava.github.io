@@ -1,7 +1,6 @@
 import * as THREE from "three";
-import { districtConfig, createSpriteLabel } from "./open-world-config.js";
+import { districtConfig, createSpriteLabel, getGltfLoader } from "./open-world-config.js";
 import { DISTRICT_ASSET_CATALOG } from "./world-assets.js";
-import { getGltfLoader } from "./open-world-config.js";
 
 // ── Floating island ground plates ────────────────────────────────
 const addGroundPlate = (scene, zone, width, depth, color, rotation = 0) => {
@@ -438,6 +437,7 @@ const addLorePylon = (scene, zone, text, offset) => {
     loreLabel.position.set(pylon.position.x, 3.5, pylon.position.z);
     scene.add(loreLabel);
   }
+  return { x: pylon.position.x, z: pylon.position.z, radius: 0.45 };
 };
 
 // ── District props ───────────────────────────────────────────────
@@ -563,9 +563,11 @@ export const createDistricts = (scene, lowPower, onAssetLoaded) => {
   const navigationRoutes = ["projects", "posts", "experiences"].map((z) => addRoute(scene, z));
 
   // Pylons
-  addLorePylon(scene, "projects", "Stellar Forge", { x: -5.8, z: 4.8 });
-  addLorePylon(scene, "posts", "Signal Array", { x: 6.2, z: 5.6 });
-  addLorePylon(scene, "experiences", "Memory Grove", { x: 5.7, z: -2.4 });
+  const pylonBlockers = [
+    addLorePylon(scene, "projects", "Stellar Forge", { x: -5.8, z: 4.8 }),
+    addLorePylon(scene, "posts", "Signal Array", { x: 6.2, z: 5.6 }),
+    addLorePylon(scene, "experiences", "Memory Grove", { x: 5.7, z: -2.4 })
+  ];
 
   // Gateways
   const districtGateways = [];
@@ -718,7 +720,7 @@ export const createDistricts = (scene, lowPower, onAssetLoaded) => {
   // GLB assets
   const districtAssetModels = [];
   const districtAssetRoots = {};
-  for (const zone of ["projects", "posts", "experiences"]) {
+  for (const zone of Object.keys(districtConfig)) {
     const cfg = districtConfig[zone];
     const root = new THREE.Group();
     root.position.set(cfg.center.x, 0, cfg.center.z + 1.8);
@@ -746,16 +748,26 @@ export const createDistricts = (scene, lowPower, onAssetLoaded) => {
   };
   for (const { zone, spec } of allAssetSpecs) mountDistrictAsset(zone, spec);
 
+  // Solid-structure blockers (landmarks, orrery, pylons, props) so the
+  // player can't walk through them. Entry-node blockers live in entries.
+  const blockers = [
+    ...landmarkDefs.map((def) => ({ x: def.position.x, z: def.position.z, radius: 1.6 })),
+    { x: fountain.group.position.x, z: fountain.group.position.z, radius: 2.0 },
+    ...pylonBlockers,
+    ...[...projPositions, ...postsPositions, ...gardenPositions].map(([px, pz]) => ({ x: px, z: pz, radius: 1.0 }))
+  ];
+
   return {
     districtGroundPlates, districtEnclosures, districtMarkers, districtGateways,
     districtLandmarks, fountain, particleOrbiters, districtProps,
     npcData, scanRings, circuitLines, navigationRoutes, districtAssetModels,
+    blockers,
     assetCount: allAssetSpecs.length
   };
 };
 
 /** Per-frame district animations. */
-export const updateDistricts = (districts, scene, dt, worldTicker, currentZone) => {
+export const updateDistricts = (districts, dt, worldTicker, currentZone) => {
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
   for (let i = 0; i < districts.districtMarkers.length; i += 1) {
@@ -899,11 +911,4 @@ export const updateDistricts = (districts, scene, dt, worldTicker, currentZone) 
     npc.mesh.position.y = Math.sin(worldTicker * 2 + npc.mesh.position.x) * 0.15;
   }
 
-  // Bob spores/orbs
-  scene.traverse((obj) => {
-    if (obj.userData.bobOrigin !== undefined) {
-      obj.userData.bobPhase = (obj.userData.bobPhase || 0) + dt * 1.4;
-      obj.position.y = obj.userData.bobOrigin + Math.sin(obj.userData.bobPhase) * 0.25;
-    }
-  });
 };

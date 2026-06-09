@@ -9,9 +9,13 @@ interface Props {
 }
 
 const { projects, posts, experiences = [], startZone = 'home' } = Astro.props;
-const projectsJson = JSON.stringify(projects).replace(/<\/script/gi, '<\\/script');
-const postsJson = JSON.stringify(posts).replace(/<\/script/gi, '<\\/script');
-const experiencesJson = JSON.stringify(experiences).replace(/<\/script/gi, '<\\/script');
+const toJsonScript = (data: unknown) =>
+  JSON.stringify(data)
+    .replace(/<\/script/gi, '<\\/script')
+    .replace(/<!--/g, '<\\!--');
+const projectsJson = toJsonScript(projects);
+const postsJson = toJsonScript(posts);
+const experiencesJson = toJsonScript(experiences);
 ---
 
 <section class="open-world-shell" id="open-world-shell" data-start-zone={startZone}>
@@ -26,7 +30,7 @@ const experiencesJson = JSON.stringify(experiences).replace(/<\/script/gi, '<\\/
 
   <!-- First-visit tutorial overlay -->
   <div class="world-tutorial" id="world-tutorial" hidden aria-hidden="true">
-    <div class="world-tutorial-hints">
+    <div class="world-tutorial-hints" data-input="keyboard">
       <div class="world-tutorial-hint">
         <span class="tutorial-key">WASD</span>
         <span class="tutorial-label">Move around</span>
@@ -38,6 +42,20 @@ const experiencesJson = JSON.stringify(experiences).replace(/<\/script/gi, '<\\/
       <div class="world-tutorial-hint">
         <span class="tutorial-key">Click</span>
         <span class="tutorial-label">Click ground to walk there</span>
+      </div>
+    </div>
+    <div class="world-tutorial-hints" data-input="touch" hidden>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">Joystick</span>
+        <span class="tutorial-label">Drag to move around</span>
+      </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">Tap</span>
+        <span class="tutorial-label">Tap near a node to inspect it</span>
+      </div>
+      <div class="world-tutorial-hint">
+        <span class="tutorial-key">Inspect</span>
+        <span class="tutorial-label">Or use the Inspect button below</span>
       </div>
     </div>
     <p class="world-tutorial-dismiss">Press any key or tap to begin</p>
@@ -79,8 +97,10 @@ const experiencesJson = JSON.stringify(experiences).replace(/<\/script/gi, '<\\/
         <button class="hud-btn hud-btn-ghost hud-btn-help-toggle" id="world-help-toggle" type="button">?</button>
       </div>
       <div class="hud-help-panel" id="world-help-panel" hidden>
-        <p class="hud-help">WASD / Arrows &middot; Click Ground to Move &middot; E to Inspect</p>
-        <p class="hud-help hud-help-sub">Shift to Sprint &middot; Space to Jump</p>
+        <p class="hud-help" data-input="keyboard">WASD / Arrows &middot; Click Ground to Move &middot; E to Inspect</p>
+        <p class="hud-help hud-help-sub" data-input="keyboard">Shift to Sprint &middot; Space to Jump</p>
+        <p class="hud-help" data-input="touch" hidden>Joystick to Move &middot; Tap Near a Node to Inspect</p>
+        <p class="hud-help hud-help-sub" data-input="touch" hidden>Hold the Sprint Button to Run</p>
         <p class="hud-help hud-help-sub">Districts: Projects (West) &middot; Posts (East) &middot; Experiences (North)</p>
       </div>
     </div>

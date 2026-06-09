@@ -28,6 +28,7 @@ const pick = (list, seed) => list[seed % list.length];
 
 export const startWorldEvents = ({
   zone = "home",
+  getZone,
   onEvent,
   minDelayMs = 18000,
   maxDelayMs = 32000,
@@ -47,8 +48,9 @@ export const startWorldEvents = ({
         return;
       }
 
-      const snapshot = getWorldSnapshot(zone);
-      const zoneEvents = eventPools[zone] || eventPools.home;
+      const activeZone = typeof getZone === "function" ? getZone() : zone;
+      const snapshot = getWorldSnapshot(activeZone);
+      const zoneEvents = eventPools[activeZone] || eventPools.home;
       const seed = Math.floor(Math.random() * 100000) + snapshot.totalVisits + snapshot.secretsFound;
       const event = pick(zoneEvents, seed);
 
@@ -59,12 +61,12 @@ export const startWorldEvents = ({
         if (Math.random() < 0.55) {
           playBeep();
         } else {
-          playWorldEventPulse(zone, snapshot.energyLevel);
+          playWorldEventPulse(activeZone, snapshot.energyLevel);
         }
       }
 
       if (typeof onEvent === "function") {
-        onEvent({ ...event, snapshot: getWorldSnapshot(zone) });
+        onEvent({ ...event, snapshot: getWorldSnapshot(activeZone) });
       }
 
       loop();

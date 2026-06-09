@@ -99,6 +99,11 @@ const bootOpenWorld = () => {
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const isTouch = window.matchMedia("(pointer: coarse)").matches;
   const lowPower = prefersReducedMotion || isTouch;
+
+  // Tutorial / help copy comes in keyboard and touch flavors.
+  for (const el of shell.querySelectorAll("[data-input]")) {
+    el.hidden = el.dataset.input !== (isTouch ? "touch" : "keyboard");
+  }
   const dprCap = lowPower ? 1 : 1.4;
   let cameraMode = "isometric";
   let qualityMode = "auto";
@@ -109,7 +114,26 @@ const bootOpenWorld = () => {
   let snapshot = getWorldSnapshot(startZone);
 
   // ── Renderer & Scene ───────────────────────────────────────────
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: "low-power" });
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: !lowPower, powerPreference: "low-power" });
+  } catch {
+    // WebGL unavailable — swap the loading overlay for plain navigation
+    // instead of leaving the spinner running forever.
+    if (loadingEl) {
+      loadingEl.innerHTML = `
+        <div class="world-loading-inner">
+          <p class="world-loading-text">This world needs WebGL, which isn't available in your browser.</p>
+          <p class="world-loading-hint">
+            Browse the classic way:
+            <a href="/projects/">Projects</a> &middot;
+            <a href="/posts/">Posts</a> &middot;
+            <a href="/experiences/">Experiences</a>
+          </p>
+        </div>`;
+    }
+    return;
+  }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = lowPower ? 0.92 : 1.0;
@@ -126,7 +150,18 @@ const bootOpenWorld = () => {
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xd8c0ff, lowPower ? 0.7 : 1.0);
   sun.position.set(30, 60, 20);
-  if (!lowPower) { sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); }
+  if (!lowPower) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    // The default directional shadow camera is a ±5 unit box; size it to
+    // cover the playable area (islands span roughly ±68 units).
+    sun.shadow.camera.left = -85;
+    sun.shadow.camera.right = 85;
+    sun.shadow.camera.top = 85;
+    sun.shadow.camera.bottom = -85;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 220;
+  }
   scene.add(sun);
   const fill = new THREE.DirectionalLight(0x4040a0, 0.35);
   fill.position.set(-35, 18, 28);
@@ -155,6 +190,14 @@ const bootOpenWorld = () => {
   if (districts.assetCount === 0) setTimeout(dismissLoading, 400);
 
   const entries = createEntries(scene, projects, posts, experiences, lowPower);
+  const worldBlockers = [...entries.blockers, ...districts.blockers];
+
+  // Collected once here instead of scene.traverse-ing every frame in the
+  // render loop (bob targets are all created synchronously above).
+  const bobbers = [];
+  scene.traverse((obj) => {
+    if (obj.userData.bobOrigin !== undefined) bobbers.push(obj);
+  });
 
   // ── Player ─────────────────────────────────────────────────────
   const startPos = getStartPosition(startZone);
@@ -193,9 +236,6 @@ const bootOpenWorld = () => {
     }
     try { window.localStorage.setItem(TUTORIAL_SEEN_KEY, "1"); } catch { /* ignore */ }
   };
-
-  // Show tutorial once loading finishes
-  const origDismissLoading = dismissLoading;
 
   // ── Secret reward payoff ───────────────────────────────────────
   const secretRewards = {
@@ -241,6 +281,19 @@ const bootOpenWorld = () => {
   let modalFocus = null;
   let qualitySampleTime = 0;
   let qualitySampleFrames = 0;
+  let minimapFrame = 0;
+  let appliedQualityTier = null;
+  let lastFocused = null;
+  const activatedBeacons = new Set();
+  const beaconTotal = districts.districtLandmarks.length;
+  const secretTotal = entries.secretNodes.length;
+
+  const setText = (el, value) => {
+    if (el && el.__lastText !== value) {
+      el.__lastText = value;
+      el.textContent = value;
+    }
+  };
 
   const raycaster = new THREE.Raycaster();
   const pointerNdc = new THREE.Vector2();
@@ -263,6 +316,7 @@ const bootOpenWorld = () => {
   // ── World events ───────────────────────────────────────────────
   const stopWorldEvents = startWorldEvents({
     zone: startZone,
+    getZone: () => currentZone,
     sound: !isMuted(),
     minDelayMs: 18000,
     maxDelayMs: 32000,
@@ -298,6 +352,8 @@ const bootOpenWorld = () => {
     detailEl.setAttribute("aria-hidden", "false");
     modalOpen = true;
     modalFocus = mesh.position.clone().add(new THREE.Vector3(0, 2.2, 0));
+    lastFocused = document.activeElement;
+    detailClose.focus();
     markInteraction(1.1);
     safeAudio(() => playHolodeckActivate());
   };
@@ -307,6 +363,7 @@ const bootOpenWorld = () => {
     landmarkCooldown = 2.5;
     landmark.pulse = 1;
     objectiveFlash = 2.4;
+    activatedBeacons.add(landmark.zone);
     markInteraction(1.4);
     snapshot = getWorldSnapshot(currentZone);
     detailTitle.textContent = landmark.title;
@@ -319,6 +376,8 @@ const bootOpenWorld = () => {
     detailEl.setAttribute("aria-hidden", "false");
     modalOpen = true;
     modalFocus = landmark.root.position.clone().add(new THREE.Vector3(0, 3.1, 0));
+    lastFocused = document.activeElement;
+    detailClose.focus();
     safeAudio(() => playBeep());
   };
 
@@ -329,6 +388,8 @@ const bootOpenWorld = () => {
     delete detailEl.dataset.kind;
     modalOpen = false;
     modalFocus = null;
+    if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
+    lastFocused = null;
     safeAudio(() => playHolodeckDeactivate());
   };
 
@@ -344,6 +405,17 @@ const bootOpenWorld = () => {
   const onKeyDown = (event) => {
     dismissTutorial();
     safeAudio(() => primeAudio());
+    if (modalOpen && event.key === "Tab") {
+      // Keep focus inside the detail dialog.
+      event.preventDefault();
+      const focusables = [detailClose, detailLink];
+      const idx = focusables.indexOf(document.activeElement);
+      const next = event.shiftKey
+        ? (idx <= 0 ? focusables.length - 1 : idx - 1)
+        : (idx + 1) % focusables.length;
+      focusables[next].focus();
+      return;
+    }
     if (keySet.has(event.key) || event.key === "Shift") event.preventDefault();
     const key = event.key.toLowerCase();
     if (key === "w" || event.key === "ArrowUp") controls.forward = true;
@@ -442,11 +514,14 @@ const bootOpenWorld = () => {
     if (!rafId) rafId = requestAnimationFrame(tick);
   };
 
+  // Pixel ratio is the biggest perf lever, so it scales with quality tier.
+  const tierDprCaps = [0.85, 1.1, 1.4];
+
   const onResize = () => {
     const width = canvas.clientWidth || window.innerWidth;
     const height = canvas.clientHeight || window.innerHeight;
     renderer.setSize(width, height, false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap, tierDprCaps[getEffectiveQualityTier()]));
     camera.aspect = width / height;
     camera.fov = cameraMode === "isometric" ? (isTouch ? 50 : 46) : (isTouch ? 68 : 58);
     camera.updateProjectionMatrix();
@@ -512,7 +587,7 @@ const bootOpenWorld = () => {
     // Player physics
     const running = controls.run && !modalOpen;
     const playerResult = updatePlayer({
-      player: playerObj.player, controls, velocity, desired, blockers: entries.blockers,
+      player: playerObj.player, controls, velocity, desired, blockers: worldBlockers,
       camera, moveTarget, modalOpen, running, lowPower, playerObj
     }, dt, worldTicker);
 
@@ -532,7 +607,13 @@ const bootOpenWorld = () => {
     updateEnvironment(env, dt, worldTicker);
 
     // District animation
-    updateDistricts(districts, scene, dt, worldTicker, currentZone);
+    updateDistricts(districts, dt, worldTicker, currentZone);
+
+    // Bobbing spores/orbs
+    for (const obj of bobbers) {
+      obj.userData.bobPhase = (obj.userData.bobPhase || 0) + dt * 1.4;
+      obj.position.y = obj.userData.bobOrigin + Math.sin(obj.userData.bobPhase) * 0.25;
+    }
 
     // Secret node collection
     for (const secret of entries.secretNodes) {
@@ -541,6 +622,8 @@ const bootOpenWorld = () => {
       secret.mesh.position.y = secret.pos.y + Math.sin(worldTicker * 2.4) * 0.28;
       if (playerObj.player.position.distanceTo(secret.mesh.position) < 1.4) {
         scene.remove(secret.mesh);
+        secret.mesh.geometry.dispose();
+        secret.mesh.material.dispose();
         if (markSecretFound(secret.key)) {
           playSecretFound();
           objectiveFlash = 2;
@@ -558,14 +641,19 @@ const bootOpenWorld = () => {
     currentZone = zoneDistances[0]?.name || "home";
     snapshot = getWorldSnapshot(currentZone);
 
-    // HUD update
-    zoneLabel.textContent = districtConfig[currentZone].title;
+    // HUD update (setText skips writes when nothing changed)
+    setText(zoneLabel, districtConfig[currentZone].title);
     const profile = districtPresentation[currentZone] || districtPresentation.home;
-    zoneBlurb.textContent = profile.blurb;
-    objectiveEl.textContent = objectiveFlash > 0 ? "Landmark activated. Explore another district." : profile.objective;
-    energyVal.textContent = `${Math.round(snapshot.energyLevel * 100)}%`;
-    secretsVal.textContent = String(snapshot.secretsFound);
-    visitsVal.textContent = String(snapshot.totalVisits);
+    setText(zoneBlurb, profile.blurb);
+    const objectiveText = objectiveFlash > 0
+      ? `Beacon activated (${activatedBeacons.size}/${beaconTotal}). Explore another district.`
+      : (activatedBeacons.size >= beaconTotal
+        ? "All beacons active. Hunt down the remaining secret shards."
+        : profile.objective);
+    setText(objectiveEl, objectiveText);
+    setText(energyVal, `${Math.round(snapshot.energyLevel * 100)}%`);
+    setText(secretsVal, `${snapshot.secretsFound}/${secretTotal}`);
+    setText(visitsVal, String(snapshot.totalVisits));
     if (sprintBadge) sprintBadge.hidden = !controls.run;
 
     // Zone transition
@@ -613,8 +701,8 @@ const bootOpenWorld = () => {
       nearby = null;
       nearbyLandmark = nearestLandmark;
       promptEl.hidden = false;
-      promptText.textContent = `Activate landmark: ${nearestLandmark.title}`;
-      actionBtn.textContent = landmarkCooldown > 0 ? "Stabilizing..." : "Activate";
+      setText(promptText, `Activate landmark: ${nearestLandmark.title}`);
+      setText(actionBtn, landmarkCooldown > 0 ? "Stabilizing..." : "Activate");
       actionBtn.disabled = landmarkCooldown > 0;
       interactionProximity = clamp(1 - nearestLandmarkDist / nearestLandmark.radius, 0, 1);
       safeAudio(() => updateProximityHum(interactionProximity));
@@ -622,8 +710,8 @@ const bootOpenWorld = () => {
       nearby = nearest;
       nearbyLandmark = null;
       promptEl.hidden = false;
-      promptText.textContent = `Inspect ${nearest.userData.kind}`;
-      actionBtn.textContent = "Inspect";
+      setText(promptText, `Inspect ${nearest.userData.kind}`);
+      setText(actionBtn, "Inspect");
       actionBtn.disabled = false;
       interactionProximity = clamp(1 - nearestDist / 4, 0, 1);
       safeAudio(() => updateProximityHum(interactionProximity));
@@ -631,7 +719,7 @@ const bootOpenWorld = () => {
       nearby = null;
       nearbyLandmark = null;
       promptEl.hidden = true;
-      actionBtn.textContent = "Inspect";
+      setText(actionBtn, "Inspect");
       actionBtn.disabled = true;
       safeAudio(() => updateProximityHum(0));
     }
@@ -640,6 +728,10 @@ const bootOpenWorld = () => {
 
     // Quality-based LOD
     const qualityTier = getEffectiveQualityTier();
+    if (qualityTier !== appliedQualityTier) {
+      appliedQualityTier = qualityTier;
+      onResize();
+    }
     const skylineDistance = qualityTier === 0 ? 42 : (qualityTier === 1 ? 58 : 74);
     const propDistance = qualityTier === 0 ? 30 : (qualityTier === 1 ? 46 : 62);
     const particleDistance = qualityTier === 0 ? 20 : (qualityTier === 1 ? 30 : 40);
@@ -649,8 +741,9 @@ const bootOpenWorld = () => {
     for (const po of districts.particleOrbiters) po.mesh.visible = po.mesh.position.distanceTo(playerObj.player.position) < particleDistance;
     for (const sr of districts.scanRings) sr.mesh.visible = qualityTier > 0;
 
-    // Minimap (every ~6 frames)
-    if (Math.floor(worldTicker * 10) % 6 === 0) {
+    // Minimap (every 6 frames)
+    minimapFrame += 1;
+    if (minimapFrame % 6 === 0) {
       drawMinimap(playerObj.player.position, currentZone);
     }
 
@@ -738,11 +831,19 @@ const bootOpenWorld = () => {
     safeAudio(() => updateProximityHum(0));
     safeAudio(() => resetFootsteps());
 
+    // material.dispose() does not release textures, so dispose maps
+    // explicitly (sprite-label CanvasTextures, GLTF textures).
+    const disposeMaterial = (mat) => {
+      for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap", "aoMap", "alphaMap"]) {
+        if (mat[key]) mat[key].dispose();
+      }
+      mat.dispose();
+    };
     scene.traverse((obj) => {
       if (obj.geometry) obj.geometry.dispose();
       if (obj.material) {
-        if (Array.isArray(obj.material)) obj.material.forEach((mat) => mat.dispose());
-        else obj.material.dispose();
+        if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
+        else disposeMaterial(obj.material);
       }
     });
     quickLook.dispose();

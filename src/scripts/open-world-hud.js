@@ -49,13 +49,14 @@ export const getHudElements = () => {
 export const createMinimap = (minimapCanvas) => {
   const ctx = minimapCanvas ? minimapCanvas.getContext("2d") : null;
 
+  // Colors match districtConfig in open-world-config.js
   const districts = [
-    { name: "home", x: 0, z: 0, color: "#a2d7ff" },
-    { name: "projects", x: -38, z: 0, color: "#4fc3f7" },
-    { name: "posts", x: 38, z: 0, color: "#ffab40" },
-    { name: "experiences", x: 0, z: -38, color: "#6de2bc" }
+    { name: "home", x: 0, z: 0, color: "#c8b0ff" },
+    { name: "projects", x: -38, z: 0, color: "#ff6b35" },
+    { name: "posts", x: 38, z: 0, color: "#00e5ff" },
+    { name: "experiences", x: 0, z: -38, color: "#7dffb3" }
   ];
-  const labels = { home: "H", projects: "P", posts: "B", experiences: "E" };
+  const labels = { home: "H", projects: "P", posts: "S", experiences: "E" };
 
   return (playerPos, zone) => {
     if (!ctx || !minimapCanvas) return;
@@ -131,26 +132,56 @@ export const createMinimap = (minimapCanvas) => {
  * Creates the quick-look preview renderer and helpers.
  */
 export const createQuickLook = (quickLookCanvas) => {
-  const quickRenderer = new THREE.WebGLRenderer({
-    canvas: quickLookCanvas,
-    alpha: true,
-    antialias: true,
-    powerPreference: "low-power"
-  });
-  quickRenderer.outputColorSpace = THREE.SRGBColorSpace;
-  quickRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.2));
+  // The WebGL context (a second one alongside the main scene) is created
+  // lazily on first use so touch/low-power sessions that never hover a
+  // node don't pay for it.
+  let quickRenderer = null;
+  let quickScene = null;
+  let quickCamera = null;
+  let meshRoot = null;
+  let contextFailed = false;
+  let pendingSize = null;
 
-  const quickScene = new THREE.Scene();
-  const quickCamera = new THREE.PerspectiveCamera(38, 320 / 200, 0.1, 40);
-  quickCamera.position.set(0, 1.15, 4.1);
-  quickCamera.lookAt(0, 0.65, 0);
-  quickScene.add(new THREE.AmbientLight(0xa4d5f3, 1.1));
-  const quickKey = new THREE.DirectionalLight(0xd0ecff, 0.9);
-  quickKey.position.set(3, 4, 2);
-  quickScene.add(quickKey);
+  const ensureContext = () => {
+    if (quickRenderer || contextFailed) return !contextFailed;
+    try {
+      quickRenderer = new THREE.WebGLRenderer({
+        canvas: quickLookCanvas,
+        alpha: true,
+        antialias: true,
+        powerPreference: "low-power"
+      });
+    } catch {
+      contextFailed = true;
+      return false;
+    }
+    quickRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    quickRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.2));
 
-  const meshRoot = new THREE.Group();
-  quickScene.add(meshRoot);
+    quickScene = new THREE.Scene();
+    quickCamera = new THREE.PerspectiveCamera(38, 320 / 200, 0.1, 40);
+    quickCamera.position.set(0, 1.15, 4.1);
+    quickCamera.lookAt(0, 0.65, 0);
+    quickScene.add(new THREE.AmbientLight(0xa4d5f3, 1.1));
+    const quickKey = new THREE.DirectionalLight(0xd0ecff, 0.9);
+    quickKey.position.set(3, 4, 2);
+    quickScene.add(quickKey);
+
+    meshRoot = new THREE.Group();
+    quickScene.add(meshRoot);
+
+    if (pendingSize) {
+      applySize(pendingSize.w, pendingSize.h);
+      pendingSize = null;
+    }
+    return true;
+  };
+
+  const applySize = (w, h) => {
+    quickRenderer.setSize(w, h, false);
+    quickCamera.aspect = w / h;
+    quickCamera.updateProjectionMatrix();
+  };
 
   let currentMesh = null;
   let currentKeyId = "";
@@ -176,10 +207,11 @@ export const createQuickLook = (quickLookCanvas) => {
       clearMesh();
       return;
     }
+    if (!ensureContext()) return;
 
     const kind = mesh.userData.kind;
     const entry = mesh.userData.entry;
-    const color = kind === "projects" ? 0x4fc3f7 : (kind === "posts" ? 0xffab40 : 0x6de2bc);
+    const color = kind === "projects" ? 0xff6b35 : (kind === "posts" ? 0x00e5ff : 0x7dffb3);
     const title = entry.title || entry.role || "Quick Look";
     const key = `${kind}:${entry.slug || entry.company || title}`;
 
@@ -200,7 +232,7 @@ export const createQuickLook = (quickLookCanvas) => {
   };
 
   const render = (dt) => {
-    if (currentMesh) {
+    if (currentMesh && quickRenderer) {
       currentMesh.rotation.y += dt * 1.1;
       quickRenderer.render(quickScene, quickCamera);
     }
@@ -209,14 +241,13 @@ export const createQuickLook = (quickLookCanvas) => {
   const resize = (canvas) => {
     const w = canvas.clientWidth || 320;
     const h = canvas.clientHeight || 200;
-    quickRenderer.setSize(w, h, false);
-    quickCamera.aspect = w / h;
-    quickCamera.updateProjectionMatrix();
+    if (quickRenderer) applySize(w, h);
+    else pendingSize = { w, h };
   };
 
   const dispose = () => {
     clearMesh();
-    quickRenderer.dispose();
+    if (quickRenderer) quickRenderer.dispose();
   };
 
   return { show, render, resize, dispose, clearMesh };

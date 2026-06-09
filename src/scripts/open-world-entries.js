@@ -7,6 +7,15 @@ import { createSpriteLabel } from "./open-world-config.js";
  * - Posts: Signal crystals (data towers, relay nodes, transmitters)
  * - Experiences: Living monuments (trees, orbs, arches)
  */
+// Stable per-entry hash so node shapes don't reshuffle on every visit.
+const hashString = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+};
+
 const addEntry = (scene, entry, kind, x, z, color, lowPower) => {
   const root = new THREE.Group();
   root.position.set(x, 0, z);
@@ -19,7 +28,7 @@ const addEntry = (scene, entry, kind, x, z, color, lowPower) => {
     metalness: 0.55
   });
 
-  const variant = Math.floor(Math.random() * 3);
+  const variant = hashString(`${kind}:${entry.slug || entry.title || entry.role || ""}`) % 3;
   let pillar;
 
   if (kind === "projects") {
@@ -193,26 +202,37 @@ export const createEntries = (scene, projects, posts, experiences, lowPower) => 
   const entryMeshes = [];
   const blockers = [];
 
+  // Row spacing compresses once a grid grows past 3 rows so nodes stay on
+  // their island (radius ~13-14) instead of marching off into the void.
+  const rowSpacing = (count) => {
+    const rows = Math.ceil(count / 3);
+    return rows <= 1 ? 12 : Math.min(12, 24 / (rows - 1));
+  };
+
+  const projectSpacing = rowSpacing(projects.length);
   projects.forEach((entry, idx) => {
     const row = Math.floor(idx / 3);
     const col = idx % 3;
     const x = -29 - col * 11.5;
-    const z = -12 + row * 12;
+    const z = -12 + row * projectSpacing;
     entryMeshes.push(addEntry(scene, entry, "projects", x, z, 0xff6b35, lowPower));
     blockers.push({ x, z, radius: 2.3 });
   });
 
+  const postSpacing = rowSpacing(posts.length);
   posts.forEach((entry, idx) => {
     const row = Math.floor(idx / 3);
     const col = idx % 3;
     const x = 30 + col * 11.5;
-    const z = -11 + row * 12;
+    const z = -11 + row * postSpacing;
     entryMeshes.push(addEntry(scene, entry, "posts", x, z, 0x00e5ff, lowPower));
     blockers.push({ x, z, radius: 2.3 });
   });
 
+  // Centered row so the line stays within the grove island's chord.
+  const expSpacing = experiences.length <= 1 ? 13 : Math.min(13, 20 / (experiences.length - 1));
   experiences.forEach((entry, idx) => {
-    const x = -13 + idx * 13;
+    const x = (idx - (experiences.length - 1) / 2) * expSpacing;
     const z = -45;
     entryMeshes.push(addEntry(scene, entry, "experiences", x, z, 0x7dffb3, lowPower));
     blockers.push({ x, z, radius: 2.3 });
