@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { clamp, getGltfLoader } from "./open-world-config.js";
+import { getGltfLoader } from "./open-world-config.js";
 
 /**
  * Creates the player avatar (capsule fallback) and ring indicator.
@@ -189,9 +189,15 @@ export const updatePlayer = (ctx, dt, worldTicker) => {
       velocity.y -= gravity * dt;
     }
 
-    player.position.x = clamp(player.position.x + velocity.x * dt, -68, 68);
+    player.position.x += velocity.x * dt;
     player.position.y = Math.max(0, player.position.y + velocity.y * dt);
-    player.position.z = clamp(player.position.z + velocity.z * dt, -68, 30);
+    player.position.z += velocity.z * dt;
+    const boundsRadius = ctx.boundsRadius || 40;
+    const fromCenter = Math.hypot(player.position.x, player.position.z);
+    if (fromCenter > boundsRadius) {
+      player.position.x *= boundsRadius / fromCenter;
+      player.position.z *= boundsRadius / fromCenter;
+    }
 
     for (const obstacle of blockers) {
       const dx = player.position.x - obstacle.x;
