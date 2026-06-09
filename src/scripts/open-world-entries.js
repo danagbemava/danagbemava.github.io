@@ -16,7 +16,7 @@ const hashString = (str) => {
   return Math.abs(hash);
 };
 
-const addEntry = (scene, entry, kind, x, z, color, lowPower) => {
+export const addEntry = (scene, entry, kind, x, z, color, lowPower) => {
   const root = new THREE.Group();
   root.position.set(x, 0, z);
 
@@ -191,8 +191,48 @@ const addEntry = (scene, entry, kind, x, z, color, lowPower) => {
   }
 
   root.userData = { kind, entry, interactionRadius: 3.8 };
+  root.userData.label = label || null;
+  root.userData.baseRing = ring;
   scene.add(root);
   return root;
+};
+
+// Golden-angle spiral positions radiating from the origin.
+export const spiralPositions = (count, startRadius = 7, spread = 2.7, maxRadius = 30) => {
+  const positions = [];
+  for (let i = 0; i < count; i += 1) {
+    const r = Math.min(maxRadius, startRadius + spread * Math.sqrt(i) * 2.2);
+    const theta = i * 2.39996 + (i % 2) * 0.35;
+    positions.push({ x: Math.cos(theta) * r, z: Math.sin(theta) * r });
+  }
+  return positions;
+};
+
+export const createSecretShard = (scene, key, color, pos) => {
+  const mesh = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.7, 0),
+    new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 2.0,
+      transparent: true, opacity: 0.7, wireframe: true
+    })
+  );
+  mesh.position.copy(pos);
+  scene.add(mesh);
+  return { key, color, pos: pos.clone(), mesh };
+};
+
+// Places one section's entries on a spiral inside `parent` (a Group).
+export const placeEntries = (parent, list, kind, color, lowPower) => {
+  const entryMeshes = [];
+  const blockers = [];
+  const positions = spiralPositions(list.length);
+  list.forEach((entry, idx) => {
+    const { x, z } = positions[idx];
+    const root = addEntry(parent, entry, kind, x, z, color, lowPower);
+    entryMeshes.push(root);
+    blockers.push({ x: x + parent.position.x, z: z + parent.position.z, radius: 2.3 });
+  });
+  return { entryMeshes, blockers };
 };
 
 /**
