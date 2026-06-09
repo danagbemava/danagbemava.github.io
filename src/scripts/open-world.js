@@ -32,6 +32,7 @@ import {
 import { createSceneManager } from "./open-world-scenes.js";
 import { createWarpController, createStarmap } from "./open-world-travel.js";
 import { createPlayer, updatePlayer } from "./open-world-player.js";
+import { createGroundFx } from "./open-world-fx.js";
 import { getHudElements, createMinimap, createQuickLook } from "./open-world-hud.js";
 
 let cleanupCurrent = null;
@@ -310,15 +311,50 @@ const bootOpenWorld = () => {
   const isometricOffset = new THREE.Vector3(15, isTouch ? 15 : 14, 15);
   const followOffset = new THREE.Vector3(0, isTouch ? 8.5 : 7.2, isTouch ? 14.5 : 12);
 
-  // Bob targets are re-collected after every scene swap.
+  // Bob targets and labels are re-collected after every scene swap.
   const bobbers = [];
+  const sceneLabels = [];
   const refreshSceneCaches = () => {
     bobbers.length = 0;
+    sceneLabels.length = 0;
     pack.group.traverse((o) => {
       if (o.userData.bobOrigin !== undefined) bobbers.push(o);
+      if (o.isSprite) sceneLabels.push(o);
     });
   };
   refreshSceneCaches();
+
+  // ── Player juice state ─────────────────────────────────────────
+  const groundFx = createGroundFx(scene, lowPower);
+  let strideAccum = 0;
+  let wasOnGroundFx = true;
+  let fovKick = 0;
+
+  // Hover/proximity highlight on the focused node.
+  const tmpLabelPos = new THREE.Vector3();
+  let highlightedNode = null;
+  const highlightScale = new THREE.Vector3(1.05, 1.05, 1.05);
+  const unitScale = new THREE.Vector3(1, 1, 1);
+  const applyHighlight = (node, dt) => {
+    const k = Math.min(1, dt * 8);
+    node.scale.lerp(highlightScale, k);
+    if (node.userData.baseRing) node.userData.baseRing.rotation.z += dt * 2.4;
+    node.traverse((o) => {
+      if (o.material && "emissiveIntensity" in o.material) {
+        if (o.userData.__baseEmissive === undefined) o.userData.__baseEmissive = o.material.emissiveIntensity;
+        o.material.emissiveIntensity = lerp(o.material.emissiveIntensity, o.userData.__baseEmissive * 1.6, k);
+      }
+    });
+  };
+  const restoreHighlight = (node) => {
+    node.scale.copy(unitScale);
+    node.traverse((o) => {
+      if (o.userData.__baseEmissive !== undefined) {
+        o.material.emissiveIntensity = o.userData.__baseEmissive;
+        delete o.userData.__baseEmissive;
+      }
+    });
+  };
 
   // ── Minimap & QuickLook ────────────────────────────────────────
   const drawMinimap = createMinimap(minimapCanvas);
@@ -336,6 +372,7 @@ const bootOpenWorld = () => {
     nearbyGate = null;
     nearbyLandmark = null;
     hoverEntry = null;
+    highlightedNode = null;
     refreshSceneCaches();
     registerVisit(key);
     snapshot = getWorldSnapshot(key);
@@ -597,7 +634,6 @@ const bootOpenWorld = () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, dprCap, tierDprCaps[getEffectiveQualityTier()]));
     if (bloomPipeline) bloomPipeline.setSize(width, height);
     camera.aspect = width / height;
-    camera.fov = cameraMode === "isometric" ? (isTouch ? 50 : 46) : (isTouch ? 68 : 58);
     camera.updateProjectionMatrix();
     quickLook.resize(quickLookCanvas);
   };
@@ -679,6 +715,25 @@ const bootOpenWorld = () => {
       } else {
         safeAudio(() => resetFootsteps());
       }
+    }
+
+    // Ground FX: footstep ripples + landing dust.
+    groundFx.update(dt);
+    if (playerResult.moving && onGround && !inputLocked) {
+      strideAccum += Math.hypot(velocity.x, velocity.z) * dt;
+      if (strideAccum > 2.2) { strideAccum -= 2.2; groundFx.ripple(playerObj.player.position); }
+    }
+    if (!wasOnGroundFx && onGround) groundFx.burst(playerObj.player.position);
+    wasOnGroundFx = onGround;
+
+    // Sprint FOV kick.
+    const targetKick = (controls.run && playerResult.moving && !inputLocked) ? 5 : 0;
+    fovKick = lerp(fovKick, targetKick, Math.min(1, dt * 5));
+    const baseFov = cameraMode === "isometric" ? (isTouch ? 50 : 46) : (isTouch ? 68 : 58);
+    const fovWithKick = baseFov + fovKick;
+    if (Math.abs(camera.fov - fovWithKick) > 0.05) {
+      camera.fov = fovWithKick;
+      camera.updateProjectionMatrix();
     }
 
     // Scene pack + backdrop animation
@@ -801,6 +856,22 @@ const bootOpenWorld = () => {
     }
 
     quickLook.show(hoverEntry || nearby, { quickLookEl, quickLookKicker, quickLookTitle, quickLookSummary, modalOpen });
+
+    // Distance-faded labels.
+    for (const label of sceneLabels) {
+      label.getWorldPosition(tmpLabelPos);
+      const ld = tmpLabelPos.distanceTo(playerObj.player.position);
+      const target = ld < 28 ? 1 - Math.max(0, (ld - 18) / 10) * 0.5 : 0;
+      label.material.opacity = lerp(label.material.opacity, target, Math.min(1, dt * 6));
+    }
+
+    // Hover/proximity highlight on the focused node.
+    const focusNode = hoverEntry || nearby;
+    if (focusNode !== highlightedNode) {
+      if (highlightedNode) restoreHighlight(highlightedNode);
+      highlightedNode = focusNode;
+    }
+    if (highlightedNode) applyHighlight(highlightedNode, dt);
 
     // Minimap (every 6 frames)
     minimapFrame += 1;
