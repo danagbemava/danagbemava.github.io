@@ -5,188 +5,231 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Celestial Hand Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --accent: #c8b0ff;
+            --accent-soft: rgba(200, 176, 255, 0.2);
+            --cyan: #00e5ff;
+            --orange: #ff6b35;
+            --mint: #7dffb3;
+            --panel-bg: rgba(10, 6, 28, 0.82);
+            --panel-border: rgba(180, 160, 255, 0.25);
+            --text: #e8e2ff;
+            --text-dim: rgba(232, 226, 255, 0.6);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+
         body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
+            background: #06021a;
+            color: var(--text);
+            font-family: "Sora", sans-serif;
             user-select: none;
             -webkit-user-select: none;
         }
 
-        canvas {
-            display: block;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse at 70% 20%, rgba(90, 16, 64, 0.35), transparent 55%),
+                radial-gradient(ellipse at 20% 80%, rgba(12, 56, 88, 0.3), transparent 55%),
+                radial-gradient(ellipse at 50% 50%, rgba(58, 24, 104, 0.25), transparent 65%),
+                #06021a;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 58%, rgba(2, 1, 8, 0.45) 100%);
+        }
+
+        canvas { display: block; }
+        #stage { position: absolute; inset: 0; z-index: 1; }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        .kicker {
+            font-size: 0.68rem;
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: var(--accent);
         }
 
         #ui-layer {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            pointer-events: none;
+            top: 16px;
+            left: 16px;
             z-index: 10;
+            pointer-events: none;
+            padding: 14px 18px;
+            max-width: 320px;
         }
 
-        h1 {
-            font-size: 1.5rem;
-            margin: 0;
-            text-shadow: 0 0 10px #4facfe;
-            font-weight: 300;
-            letter-spacing: 2px;
-        }
+        h1 { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.06em; margin-top: 2px; }
 
-        p {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            max-width: 300px;
-            margin-top: 5px;
-        }
+        #ui-layer p { font-size: 0.76rem; color: var(--text-dim); margin-top: 6px; }
 
-        /* Video is hidden, we only need the data */
         #input-video {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 1px;
-            height: 1px;
+            top: 0; left: 0;
+            width: 1px; height: 1px;
             opacity: 0;
             pointer-events: none;
         }
 
-        /* Visualizer for debugging (optional, small corner) */
         .camera-feed {
             position: absolute;
-            bottom: 80px;
-            right: 20px;
+            bottom: 92px;
+            right: 16px;
             width: 160px;
             height: 120px;
-            border-radius: 10px;
-            border: 2px solid #4facfe;
+            border-radius: 12px;
+            border: 1px solid var(--accent);
             overflow: hidden;
             z-index: 20;
             transform: scaleX(-1);
-            /* Mirror effect */
-            background: #111;
+            background: #0a0620;
             display: none;
-            /* Hidden until active */
+            box-shadow: 0 0 20px var(--accent-soft);
         }
 
-        #cam-canvas {
-            width: 100%;
-            height: 100%;
-        }
+        #cam-canvas { width: 100%; height: 100%; }
 
         .controls-container {
             position: absolute;
-            bottom: 30px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
             z-index: 20;
-            width: 90%;
-            max-width: 600px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 20px;
-            align-items: center;
+            width: 92%;
+            max-width: 560px;
         }
 
         .sliders {
             display: flex;
             align-items: center;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 20px;
-            border-radius: 20px;
-            border: 1px solid rgba(79, 172, 254, 0.3);
+            gap: 12px;
+            padding: 9px 18px;
             pointer-events: auto;
         }
 
-        label {
-            font-size: 0.8rem;
-            color: #4facfe;
-            font-weight: bold;
-        }
+        label { font-size: 0.7rem; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
 
         input[type=range] {
             -webkit-appearance: none;
+            appearance: none;
             width: 150px;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 5px;
+            height: 4px;
+            background: rgba(180, 160, 255, 0.18);
+            border-radius: 4px;
             outline: none;
         }
 
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 18px;
-            height: 18px;
+            width: 15px;
+            height: 15px;
             border-radius: 50%;
-            background: #4facfe;
+            background: var(--accent);
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(79, 172, 254, 0.8);
+            box-shadow: 0 0 10px var(--accent-soft);
         }
 
+        .controls { display: flex; gap: 12px; align-items: center; }
+
         .btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 10px 25px;
-            border-radius: 30px;
+            font-family: inherit;
+            font-size: 0.76rem;
+            color: var(--text);
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 24px;
+            padding: 9px 22px;
             cursor: pointer;
-            backdrop-filter: blur(5px);
-            font-size: 0.9rem;
-            transition: all 0.3s;
+            backdrop-filter: blur(8px);
+            letter-spacing: 0.06em;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
             pointer-events: auto;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
-        .btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            box-shadow: 0 0 15px rgba(79, 172, 254, 0.5);
-        }
+        .btn:hover { border-color: var(--accent); box-shadow: 0 0 16px var(--accent-soft); }
+        .btn.is-active { border-color: var(--orange); color: #ffd0b8; }
 
         #gesture-guide {
             position: absolute;
-            top: 20px;
-            right: 20px;
+            top: 16px;
+            right: 16px;
+            z-index: 10;
             text-align: right;
             pointer-events: none;
-            opacity: 0.9;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 20px;
-            border-radius: 10px;
-            backdrop-filter: blur(8px);
-            max-height: 80vh;
+            padding: 16px 18px;
+            max-height: 78vh;
             overflow-y: auto;
-            border: 1px solid rgba(79, 172, 254, 0.2);
         }
 
         .guide-item {
-            font-size: 0.85rem;
-            margin-bottom: 10px;
+            font-size: 0.74rem;
+            margin-bottom: 9px;
             display: flex;
             align-items: center;
             justify-content: flex-end;
             gap: 10px;
+            color: var(--text-dim);
         }
 
+        .guide-item:last-child { margin-bottom: 0; }
+
         .key {
-            font-weight: bold;
-            color: #4facfe;
-            background: rgba(255, 255, 255, 0.1);
-            padding: 2px 8px;
-            border-radius: 4px;
+            font-weight: 600;
+            color: var(--accent);
+            background: rgba(180, 160, 255, 0.1);
+            border: 1px solid var(--panel-border);
+            padding: 2px 9px;
+            border-radius: 6px;
+        }
+
+        #guide-toggle {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 11;
+            width: 36px;
+            height: 36px;
+            display: none;
+            place-items: center;
+            border-radius: 50%;
+            padding: 0;
+        }
+
+        @media (max-width: 720px) {
+            #guide-toggle { display: grid; }
+            #gesture-guide { display: none; top: 60px; }
+            #gesture-guide.is-open { display: block; }
+            #ui-layer { max-width: 230px; }
         }
 
         #toast {
@@ -194,27 +237,21 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid #4facfe;
-            padding: 20px 40px;
-            border-radius: 10px;
-            font-size: 1.5rem;
+            padding: 18px 36px;
+            font-size: 1.2rem;
+            letter-spacing: 0.08em;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.5s;
+            transition: opacity 0.5s, transform 0.5s;
             z-index: 100;
             text-align: center;
-            box-shadow: 0 0 30px rgba(79, 172, 254, 0.6);
-            backdrop-filter: blur(5px);
+            box-shadow: 0 0 30px var(--accent-soft);
         }
 
         #loader {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000;
+            inset: 0;
+            background: #06021a;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -223,37 +260,53 @@
             transition: opacity 1s;
         }
 
+        #loading-text { font-size: 0.78rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); }
+
         .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
+            width: 44px;
+            height: 44px;
+            border: 2px solid rgba(180, 160, 255, 0.25);
             border-radius: 50%;
-            border-top-color: #4facfe;
+            border-top-color: var(--accent);
             animation: spin 1s ease-in-out infinite;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+        .spinner.inline {
+            width: 14px;
+            height: 14px;
+            border-width: 2px;
+            margin: 0;
+            display: inline-block;
         }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
+    <script type="importmap">
+    { "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    } }
+    </script>
 </head>
 
-<body>
+<body data-modern="1">
 
     <div id="loader">
         <div class="spinner"></div>
-        <div id="loading-text">Initializing Universe...</div>
+        <div id="loading-text">Initializing universe…</div>
     </div>
 
-    <div id="ui-layer">
+    <div id="stage"></div>
+
+    <div id="ui-layer" class="panel">
+        <p class="kicker">Experiment</p>
         <h1>Celestial Hand Control</h1>
         <p>Use your webcam to shape the cosmos.</p>
     </div>
 
-    <div id="gesture-guide">
+    <button id="guide-toggle" class="btn panel" type="button" aria-label="Toggle gesture guide">?</button>
+    <div id="gesture-guide" class="panel">
         <div class="guide-item"><span class="key">Fist ✊</span> Solar Sphere</div>
         <div class="guide-item"><span class="key">Point ☝️</span> Sagittarius</div>
         <div class="guide-item"><span class="key">Open Palm ✋</span> Galaxy</div>
@@ -264,78 +317,57 @@
         <div class="guide-item"><span class="key">Apart 🙌</span> Big Bang</div>
     </div>
 
-    <div id="toast">Formation Detected</div>
+    <div id="toast" class="panel">Formation Detected</div>
 
     <video id="input-video" playsinline></video>
     <div class="camera-feed" id="camera-feed">
-        <canvas id="cam-canvas"></canvas>
+        <canvas id="cam-canvas" width="160" height="120"></canvas>
     </div>
 
     <div class="controls-container">
-        <div class="sliders">
+        <div class="sliders panel">
             <label for="size-slider">Particle Size</label>
             <input type="range" id="size-slider" min="0.1" max="5.0" step="0.1" value="1.5">
         </div>
         <div class="controls">
-            <button id="cam-btn" class="btn" onclick="toggleCamera()">
-                <span>📷</span> Enable Camera
-            </button>
-            <button class="btn" onclick="resetUniverse()">Reset</button>
+            <button id="cam-btn" class="btn" type="button"><span>📷</span> Enable Camera</button>
+            <button id="reset-btn" class="btn" type="button">Reset</button>
         </div>
     </div>
 
-    <!-- Three.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
-    <!-- MediaPipe -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
-        crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-
-    <script>
         /**
          * INTERNAL TWEEN IMPLEMENTATION
          */
         const TWEEN = {
             tweens: [],
-            getAll: function () { return this.tweens; },
-            removeAll: function () { this.tweens = []; },
-            add: function (tween) { this.tweens.push(tween); },
-            remove: function (tween) {
-                const i = this.tweens.indexOf(tween);
-                if (i !== -1) this.tweens.splice(i, 1);
-            },
-            update: function (time) {
+            removeAll() { this.tweens = []; },
+            add(tween) { this.tweens.push(tween); },
+            update(time) {
                 if (this.tweens.length === 0) return false;
                 let i = 0;
                 time = time !== undefined ? time : performance.now();
                 while (i < this.tweens.length) {
-                    if (this.tweens[i].update(time)) {
-                        i++;
-                    } else {
-                        this.tweens.splice(i, 1);
-                    }
+                    if (this.tweens[i].update(time)) i++;
+                    else this.tweens.splice(i, 1);
                 }
                 return true;
             },
             Easing: {
                 Exponential: {
-                    InOut: function (k) {
+                    InOut(k) {
                         if (k === 0) return 0;
                         if (k === 1) return 1;
                         if ((k *= 2) < 1) return 0.5 * Math.pow(1024, k - 1);
                         return 0.5 * (-Math.pow(2, -10 * (k - 1)) + 2);
                     },
-                    Out: function (k) {
-                        return k === 1 ? 1 : 1 - Math.pow(2, -10 * k);
-                    }
+                    Out(k) { return k === 1 ? 1 : 1 - Math.pow(2, -10 * k); }
                 },
                 Elastic: {
-                    Out: function (k) {
+                    Out(k) {
                         if (k === 0) return 0;
                         if (k === 1) return 1;
                         return Math.pow(2, -10 * k) * Math.sin((k * 10 - 0.75) * (2 * Math.PI) / 0.3) + 1;
@@ -359,14 +391,8 @@
                 if (duration !== undefined) this.duration = duration;
                 return this;
             }
-            easing(easing) {
-                this.easingFunction = easing;
-                return this;
-            }
-            onUpdate(callback) {
-                this.onUpdateCallback = callback;
-                return this;
-            }
+            easing(easing) { this.easingFunction = easing; return this; }
+            onUpdate(callback) { this.onUpdateCallback = callback; return this; }
             start(time) {
                 this.startTime = time !== undefined ? time : performance.now();
                 for (const property in this.valuesEnd) {
@@ -396,75 +422,69 @@
          */
         const CONFIG = {
             particleCount: 8000,
-            baseSize: 1.5,
+            baseSize: 1.5
         };
 
         let scene, camera, renderer, controls;
         let particles, geometry, material;
-        // Expanded target list
-        let targets = {
-            universe: [],
-            sphere: [],
-            galaxy: [],
-            sagittarius: [],
-            bigbang: [],
-            taurus: [],
-            orion: [],
-            cassiopeia: [],
-            blackhole: []
+        const targets = {
+            universe: [], sphere: [], galaxy: [], sagittarius: [],
+            bigbang: [], taurus: [], orion: [], cassiopeia: [], blackhole: []
         };
-        let currentShape = 'universe';
-        const toast = document.getElementById('toast');
-        const sizeSlider = document.getElementById('size-slider');
+        let currentShape = "universe";
+        const toast = document.getElementById("toast");
+        const sizeSlider = document.getElementById("size-slider");
 
-        // Hand Tracking Vars
-        let hands;
-        let cameraFeed;
+        // Hand tracking state
+        let landmarker = null;
         let isCameraActive = false;
         let handDistanceHistory = [];
+        let lastVideoTime = -1;
 
-        // --- INITIALIZATION ---
         init();
         animate();
 
         function init() {
-            // Scene
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.0015);
+            scene.fog = new THREE.FogExp2(0x06021a, 0.0012);
 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 3000);
+            camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1, 3000);
             camera.position.z = 400;
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+            renderer.setSize(innerWidth, innerHeight);
+            document.getElementById("stage").appendChild(renderer.domElement);
 
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls = new OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.autoRotate = true;
             controls.autoRotateSpeed = 0.3;
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
             createParticles();
 
-            // Slider Event
-            sizeSlider.addEventListener('input', (e) => {
+            sizeSlider.addEventListener("input", (e) => {
                 if (material && material.uniforms) {
                     material.uniforms.globalScale.value = parseFloat(e.target.value);
                 }
             });
 
-            window.addEventListener('resize', onWindowResize, false);
+            document.getElementById("cam-btn").addEventListener("click", toggleCamera);
+            document.getElementById("reset-btn").addEventListener("click", resetUniverse);
+            const guide = document.getElementById("gesture-guide");
+            document.getElementById("guide-toggle").addEventListener("click", () => {
+                guide.classList.toggle("is-open");
+            });
 
-            // Remove Loader
+            window.addEventListener("resize", onWindowResize, false);
+
             setTimeout(() => {
-                const loader = document.getElementById('loader');
+                const loader = document.getElementById("loader");
                 if (loader) {
-                    loader.style.opacity = '0';
+                    loader.style.opacity = "0";
                     setTimeout(() => loader.remove(), 1000);
                 }
             }, 1000);
@@ -478,11 +498,11 @@
             const sizes = [];
             const colorObj = new THREE.Color();
 
-            // Element Types Definition
+            // Element types, retinted to the site palette.
             const elements = [
-                { type: 'stardust', r: 0.7, sizeMin: 0.5, sizeMax: 2.0, colors: [0x4facfe, 0x00f2fe, 0x5f2c82, 0x00c6ff] },
-                { type: 'star', r: 0.25, sizeMin: 3.0, sizeMax: 6.0, colors: [0xffffff, 0xffeebb, 0xffd700] },
-                { type: 'giant', r: 0.05, sizeMin: 8.0, sizeMax: 15.0, colors: [0xff6b6b, 0xff416c, 0xff8c00] }
+                { type: "stardust", r: 0.7, sizeMin: 0.5, sizeMax: 2.0, colors: [0xc8b0ff, 0x00e5ff, 0x5f2c82, 0x7dffb3] },
+                { type: "star", r: 0.25, sizeMin: 3.0, sizeMax: 6.0, colors: [0xffffff, 0xffeebb, 0xffd700] },
+                { type: "giant", r: 0.05, sizeMin: 8.0, sizeMax: 15.0, colors: [0xff6b35, 0xff416c, 0xff8c00] }
             ];
 
             for (let i = 0; i < CONFIG.particleCount; i++) {
@@ -494,27 +514,22 @@
                 targets.universe.push(new THREE.Vector3(x, y, z));
                 targets.bigbang.push(new THREE.Vector3(0, 0, 0));
 
-                // Determine Element Type
                 const rand = Math.random();
                 let type;
                 if (rand < elements[0].r) type = elements[0];
                 else if (rand < elements[0].r + elements[1].r) type = elements[1];
                 else type = elements[2];
 
-                // Assign Color
                 colorObj.setHex(type.colors[Math.floor(Math.random() * type.colors.length)]);
                 colors.push(colorObj.r, colorObj.g, colorObj.b);
 
-                // Assign Size
-                const s = type.sizeMin + Math.random() * (type.sizeMax - type.sizeMin);
-                sizes.push(s);
+                sizes.push(type.sizeMin + Math.random() * (type.sizeMax - type.sizeMin));
             }
 
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-            geometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+            geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+            geometry.setAttribute("size", new THREE.Float32BufferAttribute(sizes, 1));
 
-            // Custom Shader Material
             material = new THREE.ShaderMaterial({
                 uniforms: {
                     pointTexture: { value: getStarTexture() },
@@ -553,29 +568,23 @@
         }
 
         function getStarTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 32;
-            canvas.height = 32;
-            const ctx = canvas.getContext('2d');
+            const canvas = document.createElement("canvas");
+            canvas.width = 32; canvas.height = 32;
+            const ctx = canvas.getContext("2d");
             const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-            grad.addColorStop(0, 'rgba(255,255,255,1)');
-            grad.addColorStop(0.2, 'rgba(255,255,255,0.8)');
-            grad.addColorStop(0.5, 'rgba(255,255,255,0.2)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            grad.addColorStop(0, "rgba(255,255,255,1)");
+            grad.addColorStop(0.2, "rgba(255,255,255,0.8)");
+            grad.addColorStop(0.5, "rgba(255,255,255,0.2)");
+            grad.addColorStop(1, "rgba(0,0,0,0)");
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, 32, 32);
-            const tex = new THREE.Texture(canvas);
-            tex.needsUpdate = true;
-            return tex;
+            return new THREE.CanvasTexture(canvas);
         }
 
         function calculateShapes() {
-            // Helper for linearly interpolating points
             const fillPoints = (targetArr, p1, p2, count) => {
                 for (let k = 0; k < count; k++) {
-                    const alpha = Math.random();
-                    const v = new THREE.Vector3().lerpVectors(p1, p2, alpha);
-                    // Add noise
+                    const v = new THREE.Vector3().lerpVectors(p1, p2, Math.random());
                     v.x += (Math.random() - 0.5) * 15;
                     v.y += (Math.random() - 0.5) * 15;
                     v.z += (Math.random() - 0.5) * 15;
@@ -597,35 +606,33 @@
                 const angle = i * 0.05;
                 const r = i * 0.12;
                 const armOffset = (i % 3) * (Math.PI * 2 / 3);
-                const x = Math.cos(angle + armOffset) * r * 2.5;
-                const y = (Math.random() - 0.5) * 60;
-                const z = Math.sin(angle + armOffset) * r * 2.5;
-                targets.galaxy.push(new THREE.Vector3(x, y, z));
+                targets.galaxy.push(new THREE.Vector3(
+                    Math.cos(angle + armOffset) * r * 2.5,
+                    (Math.random() - 0.5) * 60,
+                    Math.sin(angle + armOffset) * r * 2.5
+                ));
             }
 
-            // 3. Sagittarius (Approximation)
+            // 3. Sagittarius
             const sagPoints = [
                 new THREE.Vector3(0, 0, 0), new THREE.Vector3(50, 40, 0),
                 new THREE.Vector3(30, 80, 0), new THREE.Vector3(-40, 30, 0),
                 new THREE.Vector3(80, 50, 0), new THREE.Vector3(-60, 100, 0),
-                new THREE.Vector3(-80, 60, 0), new THREE.Vector3(120, 50, 0),
-            ].map(v => v.multiplyScalar(3.5));
+                new THREE.Vector3(-80, 60, 0), new THREE.Vector3(120, 50, 0)
+            ].map((v) => v.multiplyScalar(3.5));
 
             for (let i = 0; i < CONFIG.particleCount; i++) {
                 const idx = i % sagPoints.length;
                 const p1 = sagPoints[idx];
                 const p2 = sagPoints[(idx + 1) % sagPoints.length];
-                const alpha = Math.random();
-
                 if (Math.random() > 0.4) {
-                    // Cluster around star
-                    const x = p1.x + (Math.random() - 0.5) * 60;
-                    const y = p1.y + (Math.random() - 0.5) * 60;
-                    const z = p1.z + (Math.random() - 0.5) * 60;
-                    targets.sagittarius.push(new THREE.Vector3(x, y, z));
+                    targets.sagittarius.push(new THREE.Vector3(
+                        p1.x + (Math.random() - 0.5) * 60,
+                        p1.y + (Math.random() - 0.5) * 60,
+                        p1.z + (Math.random() - 0.5) * 60
+                    ));
                 } else {
-                    // Line
-                    const mixed = new THREE.Vector3().lerpVectors(p1, p2, alpha);
+                    const mixed = new THREE.Vector3().lerpVectors(p1, p2, Math.random());
                     mixed.x += (Math.random() - 0.5) * 10;
                     mixed.y += (Math.random() - 0.5) * 10;
                     mixed.z += (Math.random() - 0.5) * 10;
@@ -633,45 +640,40 @@
                 }
             }
 
-            // 4. Taurus (V Shape)
+            // 4. Taurus (V shape)
             const taurusCenter = new THREE.Vector3(0, -50, 0);
             const hornLeft = new THREE.Vector3(-150, 150, 0);
             const hornRight = new THREE.Vector3(150, 150, 0);
-
-            let taurusArr = [];
+            const taurusArr = [];
             fillPoints(taurusArr, taurusCenter, hornLeft, CONFIG.particleCount / 2);
             fillPoints(taurusArr, taurusCenter, hornRight, CONFIG.particleCount / 2);
-            // Copy to target array logic (handling overflow/underflow if count doesn't match perfectly)
             for (let i = 0; i < CONFIG.particleCount; i++) {
                 targets.taurus.push(taurusArr[i % taurusArr.length]);
             }
 
-            // 5. Orion (Hourglass / Hunter)
+            // 5. Orion
             const shoulderL = new THREE.Vector3(-100, 150, 0);
             const shoulderR = new THREE.Vector3(100, 150, 0);
             const beltL = new THREE.Vector3(-30, 0, 0);
-            const beltC = new THREE.Vector3(0, 0, 0);
             const beltR = new THREE.Vector3(30, 0, 0);
             const kneeL = new THREE.Vector3(-80, -150, 0);
             const kneeR = new THREE.Vector3(80, -150, 0);
-
-            let orionArr = [];
+            const orionArr = [];
             const orionPairs = [
                 [shoulderL, beltL], [shoulderR, beltR],
                 [beltL, kneeL], [beltR, kneeR],
-                [beltL, beltR], // Belt
-                [shoulderL, new THREE.Vector3(-130, 200, 0)], // Arm up
-                [shoulderR, new THREE.Vector3(150, 150, 0)] // Shield arm
+                [beltL, beltR],
+                [shoulderL, new THREE.Vector3(-130, 200, 0)],
+                [shoulderR, new THREE.Vector3(150, 150, 0)]
             ];
-
-            orionPairs.forEach(pair => {
+            orionPairs.forEach((pair) => {
                 fillPoints(orionArr, pair[0], pair[1], Math.ceil(CONFIG.particleCount / orionPairs.length));
             });
             for (let i = 0; i < CONFIG.particleCount; i++) {
                 targets.orion.push(orionArr[i % orionArr.length]);
             }
 
-            // 6. Cassiopeia (W Shape)
+            // 6. Cassiopeia (W shape)
             const cassPoints = [
                 new THREE.Vector3(-150, 100, 0),
                 new THREE.Vector3(-75, -50, 0),
@@ -679,7 +681,7 @@
                 new THREE.Vector3(75, -50, 0),
                 new THREE.Vector3(150, 100, 0)
             ];
-            let cassArr = [];
+            const cassArr = [];
             for (let i = 0; i < cassPoints.length - 1; i++) {
                 fillPoints(cassArr, cassPoints[i], cassPoints[i + 1], Math.ceil(CONFIG.particleCount / 4));
             }
@@ -687,101 +689,137 @@
                 targets.cassiopeia.push(cassArr[i % cassArr.length]);
             }
 
-            // 7. Black Hole (Accretion Disk)
+            // 7. Black hole (accretion disk)
             for (let i = 0; i < CONFIG.particleCount; i++) {
-                // Ring with hole
                 const angle = Math.random() * Math.PI * 2;
-                // Radius from 100 to 400 (Hole 0-100)
                 const r = 120 + Math.random() * 250;
-
-                // Add spiral effect
-                const x = Math.cos(angle) * r;
-                const z = Math.sin(angle) * r;
-                // Flat disk with slight bulge
-                const y = (Math.random() - 0.5) * (4000 / r);
-
-                targets.blackhole.push(new THREE.Vector3(x, y, z));
+                targets.blackhole.push(new THREE.Vector3(
+                    Math.cos(angle) * r,
+                    (Math.random() - 0.5) * (4000 / r),
+                    Math.sin(angle) * r
+                ));
             }
         }
 
-        // --- COMPUTER VISION LOGIC ---
+        // --- COMPUTER VISION (MediaPipe tasks-vision) ---
+
+        const videoElement = document.getElementById("input-video");
+        const camBtn = document.getElementById("cam-btn");
+        const feedContainer = document.getElementById("camera-feed");
+        const camCanvas = document.getElementById("cam-canvas");
+        const camCtx = camCanvas.getContext("2d");
+
+        const CAM_IDLE_HTML = "<span>📷</span> Enable Camera";
+
+        const resetCamButton = () => {
+            camBtn.innerHTML = CAM_IDLE_HTML;
+            camBtn.classList.remove("is-active");
+        };
+
+        const loadLandmarker = async () => {
+            if (landmarker) return landmarker;
+            const { HandLandmarker, FilesetResolver } = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/+esm");
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.18/wasm");
+            landmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                    delegate: "GPU"
+                },
+                runningMode: "VIDEO",
+                numHands: 2
+            });
+            return landmarker;
+        };
 
         async function toggleCamera() {
-            const btn = document.getElementById('cam-btn');
-            const feedContainer = document.getElementById('camera-feed');
-            const videoElement = document.getElementById('input-video');
-
             if (isCameraActive) {
                 isCameraActive = false;
                 if (videoElement.srcObject) {
-                    const tracks = videoElement.srcObject.getTracks();
-                    tracks.forEach(track => track.stop());
+                    videoElement.srcObject.getTracks().forEach((t) => t.stop());
                     videoElement.srcObject = null;
                 }
-                btn.innerHTML = '<span>📷</span> Enable Camera';
-                btn.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                btn.style.color = 'white';
-                feedContainer.style.display = 'none';
+                resetCamButton();
+                feedContainer.style.display = "none";
                 controls.enabled = true;
                 return;
             }
 
-            btn.innerHTML = '<span class="spinner" style="width:15px;height:15px;border-width:2px;display:inline-block;margin:0;"></span> Loading AI...';
+            camBtn.innerHTML = '<span class="spinner inline"></span> Loading AI…';
 
-            if (!hands) {
-                hands = new Hands({
-                    locateFile: (file) => {
-                        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-                    }
-                });
-
-                hands.setOptions({
-                    maxNumHands: 2,
-                    modelComplexity: 1,
-                    minDetectionConfidence: 0.5,
-                    minTrackingConfidence: 0.5
-                });
-
-                hands.onResults(onHandResults);
+            try {
+                await loadLandmarker();
+            } catch (err) {
+                console.warn("hand landmarker failed to load", err);
+                resetCamButton();
+                showToast("Hand-tracking model failed to load");
+                return;
             }
 
-            if (!cameraFeed) {
-                cameraFeed = new Camera(videoElement, {
-                    onFrame: async () => {
-                        if (isCameraActive) {
-                            await hands.send({ image: videoElement });
-                        }
-                    },
-                    width: 640,
-                    height: 480
-                });
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            } catch {
+                resetCamButton();
+                showToast("Camera unavailable — permission denied");
+                return;
             }
 
-            await cameraFeed.start();
+            videoElement.srcObject = stream;
+            await videoElement.play();
+
             isCameraActive = true;
-            btn.innerHTML = '🔴 Stop Camera';
-            btn.style.borderColor = '#ff4444';
-            btn.style.color = '#fff';
-            feedContainer.style.display = 'block';
+            camBtn.innerHTML = "🔴 Stop Camera";
+            camBtn.classList.add("is-active");
+            feedContainer.style.display = "block";
 
-            const camCanvas = document.getElementById('cam-canvas');
-            const ctx = camCanvas.getContext('2d');
-            function drawLoop() {
+            const detectLoop = () => {
                 if (!isCameraActive) return;
-                ctx.drawImage(videoElement, 0, 0, camCanvas.width, camCanvas.height);
-                requestAnimationFrame(drawLoop);
-            }
-            drawLoop();
+                if (videoElement.currentTime !== lastVideoTime && videoElement.videoWidth > 0) {
+                    lastVideoTime = videoElement.currentTime;
+                    const result = landmarker.detectForVideo(videoElement, performance.now());
+                    drawPreview(result.landmarks);
+                    if (result.landmarks && result.landmarks.length > 0) {
+                        detectGesture(result.landmarks);
+                    }
+                }
+                if (videoElement.requestVideoFrameCallback) {
+                    videoElement.requestVideoFrameCallback(detectLoop);
+                } else {
+                    requestAnimationFrame(detectLoop);
+                }
+            };
+            detectLoop();
         }
 
-        function onHandResults(results) {
-            const canvasCtx = document.getElementById('cam-canvas').getContext('2d');
-            if (results.multiHandLandmarks) {
-                for (const landmarks of results.multiHandLandmarks) {
-                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, { color: '#00FF00', lineWidth: 2 });
-                    drawLandmarks(canvasCtx, landmarks, { color: '#FF0000', lineWidth: 1, radius: 2 });
+        // 21-landmark hand topology connections.
+        const HAND_CONNECTIONS = [
+            [0, 1], [1, 2], [2, 3], [3, 4],
+            [0, 5], [5, 6], [6, 7], [7, 8],
+            [5, 9], [9, 10], [10, 11], [11, 12],
+            [9, 13], [13, 14], [14, 15], [15, 16],
+            [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]
+        ];
+
+        function drawPreview(allLandmarks) {
+            const w = camCanvas.width;
+            const h = camCanvas.height;
+            camCtx.drawImage(videoElement, 0, 0, w, h);
+            if (!allLandmarks) return;
+            for (const lm of allLandmarks) {
+                camCtx.strokeStyle = "#c8b0ff";
+                camCtx.lineWidth = 2;
+                for (const [a, b] of HAND_CONNECTIONS) {
+                    camCtx.beginPath();
+                    camCtx.moveTo(lm[a].x * w, lm[a].y * h);
+                    camCtx.lineTo(lm[b].x * w, lm[b].y * h);
+                    camCtx.stroke();
                 }
-                detectGesture(results.multiHandLandmarks);
+                camCtx.fillStyle = "#00e5ff";
+                for (const p of lm) {
+                    camCtx.beginPath();
+                    camCtx.arc(p.x * w, p.y * h, 2, 0, Math.PI * 2);
+                    camCtx.fill();
+                }
             }
         }
 
@@ -791,110 +829,71 @@
             const hand1 = allLandmarks[0];
             const hand2 = allLandmarks.length > 1 ? allLandmarks[1] : null;
 
-            // 1. ZOOM (Scale camera based on hand size)
+            // 1. ZOOM (hand size drives camera distance)
             const size = dist(hand1[0], hand1[5]);
             const targetCamZ = 1200 - (size * 4000);
             camera.position.z += (THREE.MathUtils.clamp(targetCamZ, 100, 1000) - camera.position.z) * 0.05;
 
-            // 2. TWO HAND GESTURE: Big Bang
+            // 2. TWO HANDS: Big Bang (hands flying apart)
             if (hand2) {
-                const center1 = hand1[9];
-                const center2 = hand2[9];
-                const d = dist(center1, center2);
-
-                handDistanceHistory.push({ d: d, t: performance.now() });
+                const d = dist(hand1[9], hand2[9]);
+                handDistanceHistory.push({ d, t: performance.now() });
                 if (handDistanceHistory.length > 10) handDistanceHistory.shift();
 
                 if (handDistanceHistory.length >= 5) {
                     const oldest = handDistanceHistory[0];
                     const newest = handDistanceHistory[handDistanceHistory.length - 1];
                     const vel = (newest.d - oldest.d) / (newest.t - oldest.t);
-
-                    if (vel > 0.0005 && d > 0.4 && currentShape !== 'bigbang') {
-                        triggerFormation('bigbang', targets.universe);
+                    if (vel > 0.0005 && d > 0.4 && currentShape !== "bigbang") {
+                        triggerFormation("bigbang", targets.universe);
                         showToast("💥 BIG BANG 💥");
                         return;
                     }
                 }
             }
 
-            // 3. SINGLE HAND GESTURES
-
-            // Helper functions for fingers (Up/Down based on Y coordinates)
-            // Note: In MediaPipe, Y increases downwards. Tip < Base means finger is UP.
-
-            const isThumbUp = (lm) => lm[4].y < lm[3].y;
-            // Index
+            // 3. SINGLE-HAND GESTURES
+            // MediaPipe Y grows downward: tip above pip means the finger is up.
             const isIndexUp = (lm) => lm[8].y < lm[6].y;
-            // Middle
             const isMiddleUp = (lm) => lm[12].y < lm[10].y;
-            // Ring
             const isRingUp = (lm) => lm[16].y < lm[14].y;
-            // Pinky
             const isPinkyUp = (lm) => lm[20].y < lm[18].y;
 
-            // -- FIST (Sun) -- 
-            // All fingers curled down
             const isFist = !isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
-
-            // -- POINT (Sagittarius) --
-            // Index Up, Others Down
             const isPointing = isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
-
-            // -- OPEN PALM (Galaxy) --
-            // All fingers Up
             const isOpenPalm = isIndexUp(hand1) && isMiddleUp(hand1) && isRingUp(hand1) && isPinkyUp(hand1);
-
-            // -- PEACE/VICTORY (Taurus) --
-            // Index & Middle Up, Ring & Pinky Down
             const isPeace = isIndexUp(hand1) && isMiddleUp(hand1) && !isRingUp(hand1) && !isPinkyUp(hand1);
-
-            // -- ROCK ON (Orion) --
-            // Index & Pinky Up, Middle & Ring Down
             const isRock = isIndexUp(hand1) && !isMiddleUp(hand1) && !isRingUp(hand1) && isPinkyUp(hand1);
-
-            // -- THREE/W (Cassiopeia) --
-            // Index, Middle, Ring Up, Pinky Down (Thumb doesn't matter much)
             const isThree = isIndexUp(hand1) && isMiddleUp(hand1) && isRingUp(hand1) && !isPinkyUp(hand1);
-
-            // -- OK SIGN (Black Hole) --
-            // Distance between Index Tip (8) and Thumb Tip (4) is small
             const dOk = dist(hand1[8], hand1[4]);
-            const isOk = dOk < 0.05 && isMiddleUp(hand1) && isRingUp(hand1); // Middle/Ring up helps distinguish from fist
+            const isOk = dOk < 0.05 && isMiddleUp(hand1) && isRingUp(hand1);
 
-            // Trigger Logic
-            if (isOk && currentShape !== 'blackhole') {
-                triggerFormation('blackhole', targets.blackhole);
+            if (isOk && currentShape !== "blackhole") {
+                triggerFormation("blackhole", targets.blackhole);
                 showToast("Black Hole ⚫");
-            }
-            else if (isRock && currentShape !== 'orion') {
-                triggerFormation('orion', targets.orion);
+            } else if (isRock && currentShape !== "orion") {
+                triggerFormation("orion", targets.orion);
                 showToast("Orion Hunter 🏹");
-            }
-            else if (isPeace && currentShape !== 'taurus') {
-                triggerFormation('taurus', targets.taurus);
+            } else if (isPeace && currentShape !== "taurus") {
+                triggerFormation("taurus", targets.taurus);
                 showToast("Taurus Bull 🐂");
-            }
-            else if (isThree && currentShape !== 'cassiopeia') {
-                triggerFormation('cassiopeia', targets.cassiopeia);
+            } else if (isThree && currentShape !== "cassiopeia") {
+                triggerFormation("cassiopeia", targets.cassiopeia);
                 showToast("Cassiopeia 👑");
-            }
-            else if (isFist && currentShape !== 'sphere') {
-                triggerFormation('sphere', targets.sphere);
+            } else if (isFist && currentShape !== "sphere") {
+                triggerFormation("sphere", targets.sphere);
                 showToast("Solar Sphere ☀️");
-            }
-            else if (isPointing && currentShape !== 'sagittarius') {
-                triggerFormation('sagittarius', targets.sagittarius);
+            } else if (isPointing && currentShape !== "sagittarius") {
+                triggerFormation("sagittarius", targets.sagittarius);
                 showToast("Sagittarius 🏹");
-            }
-            else if (isOpenPalm && currentShape !== 'galaxy' && !hand2) {
-                triggerFormation('galaxy', targets.galaxy);
+            } else if (isOpenPalm && currentShape !== "galaxy" && !hand2) {
+                triggerFormation("galaxy", targets.galaxy);
                 showToast("Galaxy Spiral 🌀");
             }
         }
 
         function dist(p1, p2) {
-            return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+            return Math.hypot(p1.x - p2.x, p1.y - p2.y);
         }
 
         // --- ANIMATION & LOGIC ---
@@ -902,12 +901,12 @@
         function triggerFormation(name, targetSet) {
             currentShape = name;
 
-            if (name === 'bigbang') {
+            if (name === "bigbang") {
                 transformTo(targets.bigbang, 500);
                 setTimeout(() => {
                     transformTo(targets.universe, 300, TWEEN.Easing.Exponential.Out);
                 }, 600);
-            } else if (name === 'blackhole') {
+            } else if (name === "blackhole") {
                 transformTo(targetSet, 2000, TWEEN.Easing.Elastic.Out);
             } else {
                 transformTo(targetSet, 1500);
@@ -937,24 +936,26 @@
         }
 
         function resetUniverse() {
-            triggerFormation('universe', targets.universe);
+            triggerFormation("universe", targets.universe);
             showToast("Universe Reset");
         }
 
+        let toastTimer = null;
         function showToast(msg) {
             toast.innerText = msg;
-            toast.style.opacity = '1';
-            toast.style.transform = 'translate(-50%, -50%) scale(1.1)';
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translate(-50%, -50%) scale(1)';
+            toast.style.opacity = "1";
+            toast.style.transform = "translate(-50%, -50%) scale(1.08)";
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translate(-50%, -50%) scale(1)";
             }, 2500);
         }
 
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.aspect = innerWidth / innerHeight;
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(innerWidth, innerHeight);
         }
 
         function animate() {
@@ -968,7 +969,6 @@
             }
             renderer.render(scene, camera);
         }
-
     </script>
 </body>
 
