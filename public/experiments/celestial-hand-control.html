@@ -185,23 +185,77 @@
             right: 16px;
             z-index: 10;
             text-align: right;
-            pointer-events: none;
-            padding: 16px 18px;
+            padding: 12px 12px;
             max-height: 78vh;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .guide-hint {
+            font-size: 0.62rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            padding: 2px 8px 6px;
         }
 
         .guide-item {
+            font-family: inherit;
             font-size: 0.74rem;
-            margin-bottom: 9px;
             display: flex;
             align-items: center;
             justify-content: flex-end;
             gap: 10px;
             color: var(--text-dim);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 9px;
+            padding: 5px 8px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
         }
 
-        .guide-item:last-child { margin-bottom: 0; }
+        .guide-item:hover { border-color: var(--panel-border); background: rgba(180, 160, 255, 0.08); color: var(--text); }
+        .guide-item.is-current { border-color: var(--accent); color: var(--text); background: var(--accent-soft); }
+
+        .hotkey {
+            font-size: 0.62rem;
+            color: var(--text-dim);
+            border: 1px solid var(--panel-border);
+            border-radius: 4px;
+            padding: 1px 5px;
+        }
+
+        #formation-chip {
+            position: absolute;
+            bottom: 92px;
+            left: 16px;
+            z-index: 10;
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            padding: 9px 16px;
+            pointer-events: none;
+        }
+
+        #formation-name { font-size: 0.86rem; font-weight: 600; letter-spacing: 0.08em; }
+
+        #fs-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 16px;
+            z-index: 20;
+            width: 38px;
+            height: 38px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            padding: 0;
+        }
+
+        #fs-btn.is-unavailable { display: none; }
 
         .key {
             font-weight: 600;
@@ -307,15 +361,19 @@
 
     <button id="guide-toggle" class="btn panel" type="button" aria-label="Toggle gesture guide">?</button>
     <div id="gesture-guide" class="panel">
-        <div class="guide-item"><span class="key">Fist ✊</span> Solar Sphere</div>
-        <div class="guide-item"><span class="key">Point ☝️</span> Sagittarius</div>
-        <div class="guide-item"><span class="key">Open Palm ✋</span> Galaxy</div>
-        <div class="guide-item"><span class="key">Peace ✌️</span> Taurus</div>
-        <div class="guide-item"><span class="key">Rock On 🤘</span> Orion</div>
-        <div class="guide-item"><span class="key">Three 🖖</span> Cassiopeia</div>
-        <div class="guide-item"><span class="key">OK Sign 👌</span> Black Hole</div>
-        <div class="guide-item"><span class="key">Apart 🙌</span> Big Bang</div>
+        <p class="guide-hint">Click, press 1–8, or gesture on camera</p>
+        <button class="guide-item" type="button" data-formation="sphere"><span class="hotkey">1</span><span class="key">Fist ✊</span> Solar Sphere</button>
+        <button class="guide-item" type="button" data-formation="sagittarius"><span class="hotkey">2</span><span class="key">Point ☝️</span> Sagittarius</button>
+        <button class="guide-item" type="button" data-formation="galaxy"><span class="hotkey">3</span><span class="key">Open Palm ✋</span> Galaxy</button>
+        <button class="guide-item" type="button" data-formation="taurus"><span class="hotkey">4</span><span class="key">Peace ✌️</span> Taurus</button>
+        <button class="guide-item" type="button" data-formation="orion"><span class="hotkey">5</span><span class="key">Rock On 🤘</span> Orion</button>
+        <button class="guide-item" type="button" data-formation="cassiopeia"><span class="hotkey">6</span><span class="key">Three 🖖</span> Cassiopeia</button>
+        <button class="guide-item" type="button" data-formation="blackhole"><span class="hotkey">7</span><span class="key">OK Sign 👌</span> Black Hole</button>
+        <button class="guide-item" type="button" data-formation="bigbang"><span class="hotkey">8</span><span class="key">Apart 🙌</span> Big Bang</button>
     </div>
+
+    <div id="formation-chip" class="panel"><span class="kicker">Formation</span><span id="formation-name">Universe</span></div>
+    <button id="fs-btn" class="btn panel" type="button" aria-label="Toggle fullscreen">⛶</button>
 
     <div id="toast" class="panel">Formation Detected</div>
 
@@ -477,6 +535,26 @@
             const guide = document.getElementById("gesture-guide");
             document.getElementById("guide-toggle").addEventListener("click", () => {
                 guide.classList.toggle("is-open");
+            });
+
+            // Formations are clickable and keyboard-driven — the camera is
+            // the magic path, not the only path.
+            const formationButtons = [...document.querySelectorAll("[data-formation]")];
+            for (const btn of formationButtons) {
+                btn.addEventListener("click", () => triggerFormationByName(btn.dataset.formation));
+            }
+            window.addEventListener("keydown", (e) => {
+                const idx = Number(e.key) - 1;
+                if (idx >= 0 && idx < formationButtons.length) {
+                    triggerFormationByName(formationButtons[idx].dataset.formation);
+                }
+            });
+
+            const fsBtn = document.getElementById("fs-btn");
+            if (!document.fullscreenEnabled) fsBtn.classList.add("is-unavailable");
+            fsBtn.addEventListener("click", () => {
+                if (document.fullscreenElement) document.exitFullscreen();
+                else document.documentElement.requestFullscreen().catch(() => showToast("Fullscreen unavailable"));
             });
 
             window.addEventListener("resize", onWindowResize, false);
@@ -898,13 +976,41 @@
 
         // --- ANIMATION & LOGIC ---
 
+        const FORMATION_LABELS = {
+            universe: "Universe", sphere: "Solar Sphere", sagittarius: "Sagittarius",
+            galaxy: "Galaxy Spiral", taurus: "Taurus Bull", orion: "Orion Hunter",
+            cassiopeia: "Cassiopeia", blackhole: "Black Hole", bigbang: "Big Bang"
+        };
+
+        const FORMATION_TOASTS = {
+            sphere: "Solar Sphere ☀️", sagittarius: "Sagittarius 🏹", galaxy: "Galaxy Spiral 🌀",
+            taurus: "Taurus Bull 🐂", orion: "Orion Hunter 🏹", cassiopeia: "Cassiopeia 👑",
+            blackhole: "Black Hole ⚫", bigbang: "💥 BIG BANG 💥"
+        };
+
+        function triggerFormationByName(name) {
+            if (currentShape === name && name !== "bigbang") return;
+            triggerFormation(name, targets[name === "bigbang" ? "universe" : name]);
+            showToast(FORMATION_TOASTS[name] || FORMATION_LABELS[name]);
+        }
+
+        function updateFormationChip() {
+            document.getElementById("formation-name").textContent = FORMATION_LABELS[currentShape] || currentShape;
+            for (const btn of document.querySelectorAll("[data-formation]")) {
+                btn.classList.toggle("is-current", btn.dataset.formation === currentShape);
+            }
+        }
+
         function triggerFormation(name, targetSet) {
             currentShape = name;
+            updateFormationChip();
 
             if (name === "bigbang") {
                 transformTo(targets.bigbang, 500);
                 setTimeout(() => {
                     transformTo(targets.universe, 300, TWEEN.Easing.Exponential.Out);
+                    currentShape = "universe";
+                    updateFormationChip();
                 }, 600);
             } else if (name === "blackhole") {
                 transformTo(targetSet, 2000, TWEEN.Easing.Elastic.Out);

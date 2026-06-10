@@ -51,6 +51,28 @@ try {
       await page.waitForTimeout(4000);
       const btnText = await page.$eval("#cam-btn", (el) => el.textContent || "");
       if (!/enable camera/i.test(btnText)) fail(`${name}: camera-denied path did not reset button (got "${btnText.trim()}")`);
+
+      // Formations must be reachable without a camera: click + hotkey.
+      await page.click('[data-formation="galaxy"]');
+      await page.waitForTimeout(600);
+      let chip = await page.$eval("#formation-name", (el) => el.textContent || "");
+      if (!/galaxy/i.test(chip)) fail(`${name}: formation click did not update chip (got "${chip}")`);
+      await page.keyboard.press("7");
+      await page.waitForTimeout(600);
+      chip = await page.$eval("#formation-name", (el) => el.textContent || "");
+      if (!/black hole/i.test(chip)) fail(`${name}: hotkey 7 did not trigger black hole (got "${chip}")`);
+    }
+
+    if (name === "fibonacci-sphere") {
+      // Demo mode must engage with one click and a preset must apply.
+      await page.click("#demo-btn");
+      await page.waitForTimeout(1500);
+      const demoOn = await page.$eval("#demo-btn", (el) => el.classList.contains("is-on"));
+      if (!demoOn) fail(`${name}: demo button did not engage`);
+      await page.click('[data-preset="lattice"]');
+      await page.waitForTimeout(800);
+      const plexusOn = await page.$eval("#plexus-btn", (el) => el.classList.contains("is-on"));
+      if (!plexusOn) fail(`${name}: lattice preset did not apply (plexus off)`);
     }
 
     if (errors.length) fail(`${name}: runtime errors:\n${errors.join("\n")}`);
