@@ -184,7 +184,7 @@
             cursor: pointer;
         }
 
-        #toggle-ui {
+        #toggle-ui, #fs-btn {
             position: absolute;
             top: 16px;
             right: 16px;
@@ -195,7 +195,13 @@
             place-items: center;
             font-size: 0.9rem;
             border-radius: 50%;
+            padding: 0;
         }
+
+        #fs-btn { top: 60px; }
+        #fs-btn.is-unavailable { display: none; }
+
+        body.is-dropping::before { filter: brightness(1.6); }
 
         #toast {
             position: absolute;
@@ -227,6 +233,7 @@
     <div id="stage"></div>
 
     <button id="toggle-ui" class="btn panel" type="button" aria-label="Toggle controls">⊟</button>
+    <button id="fs-btn" class="btn panel" type="button" aria-label="Toggle fullscreen">⛶</button>
 
     <aside id="controls" class="panel">
         <header>
@@ -237,11 +244,22 @@
             <div class="group">
                 <p class="group-title">Audio Source</p>
                 <div class="row">
+                    <button class="btn flex" id="demo-btn" type="button">✦ Demo</button>
                     <label class="btn flex" id="file-label">📁 <span id="file-name">Load Audio</span>
                         <input type="file" id="file-input" accept="audio/*" hidden>
                     </label>
                     <button class="btn" id="mic-btn" type="button">🎙</button>
                     <button class="btn" id="play-btn" type="button" disabled>▶</button>
+                </div>
+                <p class="group-title" style="text-transform:none;letter-spacing:0.04em">or drop an audio file anywhere</p>
+            </div>
+
+            <div class="group">
+                <p class="group-title">Presets</p>
+                <div class="row">
+                    <button class="btn flex" data-preset="nebula" type="button">Nebula</button>
+                    <button class="btn flex" data-preset="pulse" type="button">Pulse</button>
+                    <button class="btn flex" data-preset="lattice" type="button">Lattice</button>
                 </div>
             </div>
 
@@ -401,11 +419,14 @@
                     cube[i * 3] = sx / maxComp; cube[i * 3 + 1] = y / maxComp; cube[i * 3 + 2] = sz / maxComp;
                 }
 
-                const u = (i / count) * Math.PI * 2 * 10;
-                const v = (i / count) * Math.PI * 2;
+                // Fibonacci lattice on the torus surface: main-ring angle is
+                // uniform, tube angle winds by the golden ratio so points
+                // cover the whole donut evenly instead of tracing one coil.
+                const u = (i / count) * Math.PI * 2;
+                const v = ((i * 0.61803398875) % 1) * Math.PI * 2;
                 torus[i * 3] = (0.8 + 0.4 * Math.cos(v)) * Math.cos(u);
-                torus[i * 3 + 1] = (0.8 + 0.4 * Math.cos(v)) * Math.sin(u);
-                torus[i * 3 + 2] = 0.4 * Math.sin(v) * 0.5;
+                torus[i * 3 + 1] = 0.4 * Math.sin(v);
+                torus[i * 3 + 2] = (0.8 + 0.4 * Math.cos(v)) * Math.sin(u);
 
                 if (params.isRainbow) {
                     tmp.setHSL(i / count, 0.8, 0.6);
@@ -535,12 +556,107 @@
         const fileName = document.getElementById("file-name");
         const playBtn = document.getElementById("play-btn");
         const micBtn = document.getElementById("mic-btn");
+        const demoBtn = document.getElementById("demo-btn");
 
-        document.getElementById("file-label").addEventListener("click", () => fileInput.click());
-        fileInput.addEventListener("change", () => {
-            const file = fileInput.files && fileInput.files[0];
-            if (!file) return;
+        // ── Generative demo loop (pentatonic arp + bass pulse + pad) ──
+        let demo = null;
+
+        const stopDemo = () => {
+            if (!demo) return;
+            clearInterval(demo.interval);
+            for (const osc of demo.padOscs) { try { osc.stop(); } catch { /* already stopped */ } }
+            demo.master.disconnect();
+            demo = null;
+            demoBtn.classList.remove("is-on");
+            demoBtn.textContent = "✦ Demo";
+        };
+
+        const startDemo = () => {
+            const ctx = ensureAudioContext();
             stopMic();
+            if (audioElement && isPlaying) { audioElement.pause(); isPlaying = false; playBtn.textContent = "▶"; }
+
+            const a = makeAnalyser();
+            const master = ctx.createGain();
+            master.gain.value = 0.5;
+            master.connect(a);
+            a.connect(ctx.destination);
+
+            // Pad: two detuned saws through a slowly sweeping lowpass.
+            const filter = ctx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.value = 600;
+            const padGain = ctx.createGain();
+            padGain.gain.value = 0.045;
+            filter.connect(padGain).connect(master);
+            const padOscs = [110, 110.7].map((freq) => {
+                const osc = ctx.createOscillator();
+                osc.type = "sawtooth";
+                osc.frequency.value = freq;
+                osc.connect(filter);
+                osc.start();
+                return osc;
+            });
+            const lfo = ctx.createOscillator();
+            const lfoGain = ctx.createGain();
+            lfo.frequency.value = 0.08;
+            lfoGain.gain.value = 350;
+            lfo.connect(lfoGain).connect(filter.frequency);
+            lfo.start();
+            padOscs.push(lfo);
+
+            // Step sequencer: bass thump on even steps, arp note each step.
+            const scale = [220, 261.63, 293.66, 329.63, 392, 440];
+            let step = 0;
+            const interval = setInterval(() => {
+                const t = ctx.currentTime;
+                if (step % 2 === 0) {
+                    const bass = ctx.createOscillator();
+                    const bg = ctx.createGain();
+                    bass.type = "sine";
+                    bass.frequency.setValueAtTime(58, t);
+                    bass.frequency.exponentialRampToValueAtTime(40, t + 0.25);
+                    bg.gain.setValueAtTime(0.5, t);
+                    bg.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+                    bass.connect(bg).connect(master);
+                    bass.start(t);
+                    bass.stop(t + 0.32);
+                }
+                const arp = ctx.createOscillator();
+                const ag = ctx.createGain();
+                arp.type = "triangle";
+                const note = scale[(step * 3 + Math.floor(step / 8)) % scale.length];
+                arp.frequency.value = step % 8 < 4 ? note : note * 2;
+                ag.gain.setValueAtTime(0.07, t);
+                ag.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+                arp.connect(ag).connect(master);
+                arp.start(t);
+                arp.stop(t + 0.22);
+                step += 1;
+            }, 250);
+
+            demo = { master, interval, padOscs };
+            audioMode = "demo";
+            demoBtn.classList.add("is-on");
+            demoBtn.textContent = "✦ Demo On";
+        };
+
+        demoBtn.addEventListener("click", () => {
+            if (demo) {
+                stopDemo();
+                analyser = null; dataArray = null; audioMode = "none";
+                return;
+            }
+            startDemo();
+        });
+
+        const loadAudioFile = (file) => {
+            if (!file || !file.type.startsWith("audio/")) {
+                toast("That doesn't look like an audio file");
+                return;
+            }
+            stopMic();
+            stopDemo();
             if (audioElement) { audioElement.pause(); audioElement.src = ""; audioElement = null; }
             isPlaying = false;
             const ctx = ensureAudioContext();
@@ -555,11 +671,33 @@
             fileName.textContent = file.name.length > 16 ? `${file.name.slice(0, 13)}…` : file.name;
             playBtn.disabled = false;
             playBtn.textContent = "▶";
+        };
+
+        document.getElementById("file-label").addEventListener("click", () => fileInput.click());
+        fileInput.addEventListener("change", () => {
+            loadAudioFile(fileInput.files && fileInput.files[0]);
+        });
+
+        // Drag & drop audio anywhere on the page.
+        document.body.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            document.body.classList.add("is-dropping");
+        });
+        document.body.addEventListener("dragleave", () => document.body.classList.remove("is-dropping"));
+        document.body.addEventListener("drop", (e) => {
+            e.preventDefault();
+            document.body.classList.remove("is-dropping");
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (file) {
+                loadAudioFile(file);
+                if (audioElement) { audioElement.play(); isPlaying = true; playBtn.textContent = "⏸"; }
+            }
         });
 
         playBtn.addEventListener("click", () => {
             if (!audioElement) return;
             ensureAudioContext();
+            stopDemo();
             if (isPlaying) { audioElement.pause(); isPlaying = false; playBtn.textContent = "▶"; }
             else { audioElement.play(); isPlaying = true; playBtn.textContent = "⏸"; }
         });
@@ -573,6 +711,7 @@
             }
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                stopDemo();
                 if (audioElement && isPlaying) { audioElement.pause(); isPlaying = false; playBtn.textContent = "▶"; }
                 const ctx = ensureAudioContext();
                 micStream = stream;
@@ -647,6 +786,69 @@
             const hidden = controlsEl.classList.toggle("is-hidden");
             toggleUi.textContent = hidden ? "⊞" : "⊟";
         });
+
+        // ── Fullscreen ────────────────────────────────────────────
+        const fsBtn = document.getElementById("fs-btn");
+        if (!document.fullscreenEnabled) fsBtn.classList.add("is-unavailable");
+        fsBtn.addEventListener("click", () => {
+            if (document.fullscreenElement) document.exitFullscreen();
+            else document.documentElement.requestFullscreen().catch(() => toast("Fullscreen unavailable"));
+        });
+
+        // ── Presets ───────────────────────────────────────────────
+        const presets = {
+            nebula: {
+                shape: "sphere", isRainbow: false, baseColor: "#c8b0ff",
+                noiseStrength: 0.9, showConnections: false, showPlanets: true,
+                rotationSpeed: 0.35, pointSize: 0.6, audioGain: 2.0, bassBoost: 1.2
+            },
+            pulse: {
+                shape: "cube", isRainbow: true, baseColor: "#ff6b35",
+                noiseStrength: 0.15, showConnections: false, showPlanets: true,
+                rotationSpeed: 0.5, pointSize: 0.5, audioGain: 3.4, bassBoost: 2.0
+            },
+            lattice: {
+                shape: "torus", isRainbow: false, baseColor: "#00e5ff",
+                noiseStrength: 0.1, showConnections: true, showPlanets: false,
+                rotationSpeed: 0.25, pointSize: 0.4, audioGain: 2.0, bassBoost: 1.0
+            }
+        };
+
+        // Push current params back into every control.
+        const syncUI = () => {
+            const setRange = (id, outId, value, fmt = (v) => v.toFixed(2)) => {
+                document.getElementById(id).value = value;
+                document.getElementById(outId).textContent = fmt(value);
+            };
+            setRange("noise-range", "noise-out", params.noiseStrength);
+            setRange("rot-range", "rot-out", params.rotationSpeed);
+            setRange("gain-range", "gain-out", params.audioGain, (v) => v.toFixed(1));
+            setRange("bass-range", "bass-out", params.bassBoost, (v) => v.toFixed(1));
+            for (const b of document.querySelectorAll("#shape-seg button")) {
+                b.classList.toggle("is-active", b.dataset.shape === params.shape);
+            }
+            const syncToggle = (id, on, label) => {
+                const btn = document.getElementById(id);
+                btn.classList.toggle("is-on", on);
+                btn.textContent = `${label}: ${on ? "On" : "Off"}`;
+            };
+            syncToggle("plexus-btn", params.showConnections, "Plexus");
+            syncToggle("planets-btn", params.showPlanets, "Planets");
+            syncToggle("rainbow-btn", params.isRainbow, "Rainbow");
+            document.getElementById("color-input").value = params.baseColor;
+            document.getElementById("count-input").value = params.pointCount;
+            document.getElementById("size-input").value = params.pointSize;
+        };
+
+        for (const btn of document.querySelectorAll("[data-preset]")) {
+            btn.addEventListener("click", () => {
+                Object.assign(params, presets[btn.dataset.preset]);
+                pointsMaterial.size = params.pointSize;
+                syncUI();
+                buildGeometry();
+                toast(`Preset: ${btn.textContent}`);
+            });
+        }
 
         // ── Pointer input: drag rotate + pinch zoom ───────────────
         const activePointers = new Map();
