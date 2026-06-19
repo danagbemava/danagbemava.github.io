@@ -16,7 +16,7 @@ import {
   playWarpTunnel,
   playArrival
 } from "./sfx.js";
-import { getWorldSnapshot, registerVisit, markInteraction, markSecretFound, getSecretsFound } from "./world-state.js";
+import { getWorldSnapshot, registerVisit, markInteraction, markSecretFound, getSecretsFound, markPostJourneyed, isPostJourneyed } from "./world-state.js";
 import { startWorldEvents } from "./world-events.js";
 import {
   clamp,
@@ -93,6 +93,8 @@ const bootOpenWorld = () => {
   window.__wbTest = window.__wbTest || {};
   window.__wbTest.postSlug = (i) => (content.posts[i] || {}).slug || null;
   window.__wbTest.fetchSections = (slug) => fetchPostSections(slug);
+  window.__wbTest.markPostJourneyed = (slug) => markPostJourneyed(slug);
+  window.__wbTest.isPostJourneyed = (slug) => isPostJourneyed(slug);
 
   // ── Platform ───────────────────────────────────────────────────
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

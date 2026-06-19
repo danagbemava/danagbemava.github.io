@@ -60,6 +60,16 @@ try {
     fail(`section count ${data.sections.length} != expected ${expectedCount} for ${slug}`);
   }
 
+  // ── Task 2: world-state persists journeyed posts ──
+  const persistResult = await page.evaluate((s) => {
+    const first = window.__wbTest.markPostJourneyed(s);
+    const second = window.__wbTest.markPostJourneyed(s);
+    return { first, second, isMarked: window.__wbTest.isPostJourneyed(s) };
+  }, slug);
+  if (persistResult.first !== true) fail("markPostJourneyed should return true on first mark");
+  if (persistResult.second !== false) fail("markPostJourneyed should return false on repeat");
+  if (persistResult.isMarked !== true) fail("isPostJourneyed should be true after marking");
+
   if (errors.length) fail(`runtime errors:\n${errors.join("\n")}`);
   console.log(process.exitCode ? "JOURNEY SMOKE FAILED" : "JOURNEY SMOKE PASSED");
 } finally {
