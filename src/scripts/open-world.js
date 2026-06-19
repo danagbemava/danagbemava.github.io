@@ -35,6 +35,7 @@ import { createPlayer, updatePlayer } from "./open-world-player.js";
 import { createGroundFx } from "./open-world-fx.js";
 import { getHudElements, createMinimap, createQuickLook } from "./open-world-hud.js";
 import { fetchPostSections } from "./post-content.js";
+import { createPostJourney } from "./open-world-journey.js";
 
 let cleanupCurrent = null;
 let _booted = false;
@@ -69,6 +70,21 @@ const bootOpenWorld = () => {
   const secretRewardEl = document.getElementById("world-secret-reward");
   const secretRewardTitle = document.getElementById("world-secret-reward-title");
   const secretRewardText = document.getElementById("world-secret-reward-text");
+
+  // Journey overlay + HUD elements
+  const journeyEls = {
+    root: document.getElementById("world-journey-overlay"),
+    title: document.getElementById("world-journey-title"),
+    body: document.getElementById("world-journey-body"),
+    progress: document.getElementById("world-journey-progress"),
+    closeBtn: document.getElementById("world-journey-close"),
+    prevBtn: document.getElementById("world-journey-prev"),
+    nextBtn: document.getElementById("world-journey-next"),
+    plainLink: document.getElementById("world-journey-plain"),
+    hud: document.getElementById("world-journey-hud"),
+    hudProgress: document.getElementById("world-journey-hud-progress"),
+    leaveBtn: document.getElementById("world-journey-leave")
+  };
 
   // ── Loading helpers ────────────────────────────────────────────
   const updateLoadingHint = (text) => { if (loadingHint) loadingHint.textContent = text; };
@@ -378,6 +394,7 @@ const bootOpenWorld = () => {
 
   // ── Travel ─────────────────────────────────────────────────────
   const performSwap = (key) => {
+    if (typeof journey !== "undefined" && journey.active) journey.leave();
     pack = sceneManager.swap(key, onAssetLoaded);
     const ready = beginAssetWait(pack.assetCount);
     const s = destinations[key].spawn;
@@ -390,6 +407,9 @@ const bootOpenWorld = () => {
     hoverEntry = null;
     highlightedNode = null;
     refreshSceneCaches();
+    for (const m of pack.entryMeshes) {
+      if (m.userData.kind === "posts" && isPostJourneyed(m.userData.entry.slug)) tintJourneyedNode(m);
+    }
     registerVisit(key);
     snapshot = getWorldSnapshot(key);
     return ready;
@@ -436,11 +456,73 @@ const bootOpenWorld = () => {
     onEvent: () => { markInteraction(0.35); }
   });
 
+  // ── Post journey ───────────────────────────────────────────────
+  const setWorldContentVisible = (visible) => {
+    for (const m of pack.entryMeshes) m.visible = visible;
+    for (const g of pack.gates) g.root.visible = visible;
+    if (pack.landmark) pack.landmark.root.visible = visible;
+    for (const s of pack.secretNodes) if (s.mesh) s.mesh.visible = visible;
+  };
+
+  const tintJourneyedNode = (mesh) => {
+    if (mesh && mesh.userData.baseRing) mesh.userData.baseRing.material.color.set(0x7dffd0);
+  };
+
+  const journey = createPostJourney({
+    scene, playerObj, setText,
+    hud: { promptEl, promptText, actionBtn },
+    overlay: journeyEls,
+    fetchSections: fetchPostSections,
+    onEnter: () => setWorldContentVisible(false),
+    onLeave: () => setWorldContentVisible(true),
+    onComplete: (s) => {
+      markPostJourneyed(s);
+      const node = pack.entryMeshes.find((m) => m.userData.kind === "posts" && m.userData.entry.slug === s);
+      tintJourneyedNode(node);
+    },
+    onNextPost: () => {
+      const list = content.posts;
+      const idx = list.findIndex((p) => p.slug === journey.currentSlug);
+      const nextEntry = idx >= 0 ? list[(idx + 1) % list.length] : list[0];
+      journey.leave();
+      if (nextEntry) journey.start(nextEntry, null);
+    },
+    sounds: {
+      start: () => safeAudio(() => playWarpCharge()),
+      open: () => safeAudio(() => playHolodeckActivate()),
+      close: () => safeAudio(() => playHolodeckDeactivate()),
+      complete: () => safeAudio(() => playSecretFound()),
+      leave: () => safeAudio(() => playHolodeckDeactivate())
+    }
+  });
+
+  window.__wbTest.start = (i) => {
+    journey.start(content.posts[i], null);
+    return { active: journey.active, sectionCount: journey.sectionCount };
+  };
+  window.__wbTest.readAll = () => {
+    const n = journey.sectionCount;
+    for (let i = 0; i < n; i += 1) { journey.openSectionByIndex(i); journey.closeOverlay(); }
+    return {
+      sectionCount: n,
+      readCount: journey.readCount,
+      allRead: journey.allRead,
+      persisted: isPostJourneyed(journey.currentSlug)
+    };
+  };
+  window.__wbTest.leave = () => {
+    journey.leave();
+    return { active: journey.active, worldVisible: pack.entryMeshes[0] ? pack.entryMeshes[0].visible : true };
+  };
+  window.__wbTest.journeyActive = () => journey.active;
+  window.__wbTest.sectionCount = () => journey.sectionCount;
+
   // ── Interaction helpers ────────────────────────────────────────
   const openEntry = (mesh) => {
     if (!mesh) return;
     const kind = mesh.userData.kind;
     const entry = mesh.userData.entry;
+    if (kind === "posts") { journey.start(entry, mesh); markInteraction(0.8); return; }
     const title = entry.title || entry.role || "Entry";
 
     detailTitle.textContent = title;
@@ -451,10 +533,6 @@ const bootOpenWorld = () => {
       detailSummary.textContent = entry.description || "Open project details.";
       detailLink.textContent = "Open Project";
       detailLink.href = `/projects/${entry.slug}`;
-    } else if (kind === "posts") {
-      detailSummary.textContent = entry.excerpt || "Open post details.";
-      detailLink.textContent = "Read Post";
-      detailLink.href = `/posts/${entry.slug}`;
     } else {
       detailSummary.textContent = summarizeExperience(entry);
       detailLink.textContent = "Go To Experiences";
@@ -507,6 +585,7 @@ const bootOpenWorld = () => {
   };
 
   const tryInspect = () => {
+    if (journey.active) { journey.tryOpen(); return; }
     if (nearbyGate && !warp.warping) { warp.warpTo(nearbyGate.key); return; }
     if (nearbyLandmark) { activateLandmark(nearbyLandmark); return; }
     if (nearby) { openEntry(nearby); return; }
@@ -542,6 +621,8 @@ const bootOpenWorld = () => {
     if (key === "m") { starmap.toggle(); return; }
     if (event.key === "Escape") {
       if (starmap.isOpen) { starmap.hide(); return; }
+      if (journey.overlayOpen) { journey.closeOverlay(); return; }
+      if (journey.active) { journey.leave(); return; }
       closeEntry();
     }
     if (!ambientStarted) {
@@ -711,14 +792,15 @@ const bootOpenWorld = () => {
     }
 
     const traveling = warp.warping;
-    const inputLocked = modalOpen || traveling || starmap.isOpen;
+    const inputLocked = modalOpen || traveling || starmap.isOpen || journey.overlayOpen;
 
     // Player physics
     const running = controls.run && !inputLocked;
     const playerResult = updatePlayer({
-      player: playerObj.player, controls, velocity, desired, blockers: pack.blockers,
+      player: playerObj.player, controls, velocity, desired,
+      blockers: journey.active ? journey.blockers : pack.blockers,
       camera, moveTarget, modalOpen: inputLocked, running, lowPower, playerObj,
-      boundsRadius: dest().boundsRadius
+      boundsRadius: journey.active ? journey.boundsRadius : dest().boundsRadius
     }, dt, worldTicker);
 
     moveTarget = playerResult.moveTarget;
@@ -762,7 +844,7 @@ const bootOpenWorld = () => {
     }
 
     // Secret node collection
-    for (const secret of pack.secretNodes) {
+    if (!journey.active) for (const secret of pack.secretNodes) {
       if (!secret.mesh.parent) continue;
       if (playerObj.player.position.distanceTo(secret.mesh.position) < 1.4) {
         secret.mesh.removeFromParent();
@@ -804,74 +886,78 @@ const bootOpenWorld = () => {
     // Proximity detection: gates take priority, then landmark, then entries.
     let nearestGate = null;
     let nearestGateDist = Infinity;
-    for (const gate of pack.gates) {
-      const gd = Math.hypot(
-        playerObj.player.position.x - gate.root.position.x,
-        playerObj.player.position.z - gate.root.position.z
-      );
-      if (gd < nearestGateDist) { nearestGateDist = gd; nearestGate = gate; }
-      gate.setCharge(0);
-    }
-
-    let nearest = null;
-    let nearestDist = Infinity;
-    for (const mesh of pack.entryMeshes) {
-      const dist = Math.hypot(playerObj.player.position.x - mesh.position.x, playerObj.player.position.z - mesh.position.z);
-      if (dist < nearestDist) { nearestDist = dist; nearest = mesh; }
-    }
-
-    let landmarkDist = Infinity;
-    if (pack.landmark) {
-      landmarkDist = Math.hypot(
-        playerObj.player.position.x - pack.landmark.root.position.x,
-        playerObj.player.position.z - pack.landmark.root.position.z
-      );
-    }
-
     let interactionProximity = 0;
-
-    if (nearestGate && nearestGateDist < nearestGate.radius && !traveling) {
-      nearbyGate = nearestGate;
-      nearby = null;
-      nearbyLandmark = null;
-      nearestGate.setCharge(clamp(1 - nearestGateDist / nearestGate.radius, 0, 1));
-      promptEl.hidden = false;
-      setText(promptText, nearestGate.title);
-      setText(actionBtn, "Warp");
-      actionBtn.disabled = false;
-      interactionProximity = clamp(1 - nearestGateDist / nearestGate.radius, 0, 1);
-      safeAudio(() => updateProximityHum(interactionProximity));
-    } else if (pack.landmark && landmarkDist < pack.landmark.radius) {
-      nearbyGate = null;
-      nearby = null;
-      nearbyLandmark = pack.landmark;
-      promptEl.hidden = false;
-      setText(promptText, `Activate landmark: ${pack.landmark.title}`);
-      setText(actionBtn, landmarkCooldown > 0 ? "Stabilizing..." : "Activate");
-      actionBtn.disabled = landmarkCooldown > 0;
-      interactionProximity = clamp(1 - landmarkDist / pack.landmark.radius, 0, 1);
-      safeAudio(() => updateProximityHum(interactionProximity));
-    } else if (nearest && nearestDist < (nearest.userData.interactionRadius || 4)) {
-      nearbyGate = null;
-      nearby = nearest;
-      nearbyLandmark = null;
-      promptEl.hidden = false;
-      setText(promptText, `Inspect ${nearest.userData.kind}`);
-      setText(actionBtn, "Inspect");
-      actionBtn.disabled = false;
-      interactionProximity = clamp(1 - nearestDist / 4, 0, 1);
-      safeAudio(() => updateProximityHum(interactionProximity));
+    if (journey.active) {
+      journey.update(dt);
+      if (quickLookEl) quickLookEl.hidden = true;
     } else {
-      nearbyGate = null;
-      nearby = null;
-      nearbyLandmark = null;
-      promptEl.hidden = true;
-      setText(actionBtn, "Inspect");
-      actionBtn.disabled = true;
-      safeAudio(() => updateProximityHum(0));
-    }
+      for (const gate of pack.gates) {
+        const gd = Math.hypot(
+          playerObj.player.position.x - gate.root.position.x,
+          playerObj.player.position.z - gate.root.position.z
+        );
+        if (gd < nearestGateDist) { nearestGateDist = gd; nearestGate = gate; }
+        gate.setCharge(0);
+      }
 
-    quickLook.show(hoverEntry || nearby, { quickLookEl, quickLookKicker, quickLookTitle, quickLookSummary, modalOpen });
+      let nearest = null;
+      let nearestDist = Infinity;
+      for (const mesh of pack.entryMeshes) {
+        const dist = Math.hypot(playerObj.player.position.x - mesh.position.x, playerObj.player.position.z - mesh.position.z);
+        if (dist < nearestDist) { nearestDist = dist; nearest = mesh; }
+      }
+
+      let landmarkDist = Infinity;
+      if (pack.landmark) {
+        landmarkDist = Math.hypot(
+          playerObj.player.position.x - pack.landmark.root.position.x,
+          playerObj.player.position.z - pack.landmark.root.position.z
+        );
+      }
+
+      if (nearestGate && nearestGateDist < nearestGate.radius && !traveling) {
+        nearbyGate = nearestGate;
+        nearby = null;
+        nearbyLandmark = null;
+        nearestGate.setCharge(clamp(1 - nearestGateDist / nearestGate.radius, 0, 1));
+        promptEl.hidden = false;
+        setText(promptText, nearestGate.title);
+        setText(actionBtn, "Warp");
+        actionBtn.disabled = false;
+        interactionProximity = clamp(1 - nearestGateDist / nearestGate.radius, 0, 1);
+        safeAudio(() => updateProximityHum(interactionProximity));
+      } else if (pack.landmark && landmarkDist < pack.landmark.radius) {
+        nearbyGate = null;
+        nearby = null;
+        nearbyLandmark = pack.landmark;
+        promptEl.hidden = false;
+        setText(promptText, `Activate landmark: ${pack.landmark.title}`);
+        setText(actionBtn, landmarkCooldown > 0 ? "Stabilizing..." : "Activate");
+        actionBtn.disabled = landmarkCooldown > 0;
+        interactionProximity = clamp(1 - landmarkDist / pack.landmark.radius, 0, 1);
+        safeAudio(() => updateProximityHum(interactionProximity));
+      } else if (nearest && nearestDist < (nearest.userData.interactionRadius || 4)) {
+        nearbyGate = null;
+        nearby = nearest;
+        nearbyLandmark = null;
+        promptEl.hidden = false;
+        setText(promptText, `Inspect ${nearest.userData.kind}`);
+        setText(actionBtn, "Inspect");
+        actionBtn.disabled = false;
+        interactionProximity = clamp(1 - nearestDist / 4, 0, 1);
+        safeAudio(() => updateProximityHum(interactionProximity));
+      } else {
+        nearbyGate = null;
+        nearby = null;
+        nearbyLandmark = null;
+        promptEl.hidden = true;
+        setText(actionBtn, "Inspect");
+        actionBtn.disabled = true;
+        safeAudio(() => updateProximityHum(0));
+      }
+
+      quickLook.show(hoverEntry || nearby, { quickLookEl, quickLookKicker, quickLookTitle, quickLookSummary, modalOpen });
+    }
 
     // Distance-faded labels.
     for (const label of sceneLabels) {
@@ -1009,6 +1095,7 @@ const bootOpenWorld = () => {
       }
     });
     quickLook.dispose();
+    journey.dispose();
     if (bloomPipeline) bloomPipeline.dispose();
     renderer.dispose();
   };

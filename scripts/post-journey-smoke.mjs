@@ -79,7 +79,19 @@ try {
   if (!overlayHidden) fail("journey overlay should start hidden");
 
   // ── Task 4/5: journey lifecycle (start, read all, complete, leave) ──
-  const started = await page.evaluate((i) => window.__wbTest.start(i), 0);
+  // Enter the Signal (posts) world before exercising the journey.
+  // Dismiss tutorial overlay if present so it doesn't block clicks.
+  const tutorialEl = await page.$("#world-tutorial");
+  if (tutorialEl) {
+    const hidden = await tutorialEl.evaluate((el) => el.hidden);
+    if (!hidden) await page.click("#world-tutorial");
+  }
+  await page.click("#world-starmap-btn");
+  await page.click('.world-starmap-dest[data-dest="posts"]');
+  await page.waitForTimeout(3500);
+  await page.evaluate((i) => window.__wbTest.start(i), 0);
+  await page.waitForTimeout(800); // allow fetch + trail build
+  const started = await page.evaluate(() => ({ active: window.__wbTest.journeyActive(), sectionCount: window.__wbTest.sectionCount() }));
   if (!started || !started.active) fail("journey did not become active on start");
   if (started.sectionCount !== expectedCount) {
     fail(`journey sectionCount ${started.sectionCount} != expected ${expectedCount}`);
