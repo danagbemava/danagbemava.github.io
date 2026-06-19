@@ -1,7 +1,7 @@
 # Post Journey — In-World Checkpoint Reading (Design)
 
 **Date:** 2026-06-19
-**Status:** Approved (pending spec review)
+**Status:** Implemented (2026-06-19)
 **Scope:** The **Signal** world of the Three.js open world (`/world/`). Posts only.
 
 ## Summary
