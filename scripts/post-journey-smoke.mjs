@@ -78,6 +78,22 @@ try {
   const overlayHidden = await page.$eval("#world-journey-overlay", (el) => el.hidden);
   if (!overlayHidden) fail("journey overlay should start hidden");
 
+  // ── Task 4/5: journey lifecycle (start, read all, complete, leave) ──
+  const started = await page.evaluate((i) => window.__wbTest.start(i), 0);
+  if (!started || !started.active) fail("journey did not become active on start");
+  if (started.sectionCount !== expectedCount) {
+    fail(`journey sectionCount ${started.sectionCount} != expected ${expectedCount}`);
+  }
+
+  const completed = await page.evaluate(() => window.__wbTest.readAll());
+  if (completed.readCount !== completed.sectionCount) fail("readAll did not read every section");
+  if (!completed.allRead) fail("allRead should be true after reading every section");
+  if (!completed.persisted) fail("completing the journey should persist the slug");
+
+  const left = await page.evaluate(() => window.__wbTest.leave());
+  if (left.active) fail("journey should be inactive after leave");
+  if (!left.worldVisible) fail("Signal nodes should be visible again after leave");
+
   if (errors.length) fail(`runtime errors:\n${errors.join("\n")}`);
   console.log(process.exitCode ? "JOURNEY SMOKE FAILED" : "JOURNEY SMOKE PASSED");
 } finally {
