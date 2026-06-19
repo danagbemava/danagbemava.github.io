@@ -70,6 +70,14 @@ try {
   if (persistResult.second !== false) fail("markPostJourneyed should return false on repeat");
   if (persistResult.isMarked !== true) fail("isPostJourneyed should be true after marking");
 
+  // ── Task 3: journey overlay + HUD markup present and hidden by default ──
+  for (const id of ["world-journey-overlay", "world-journey-body", "world-journey-hud", "world-journey-leave"]) {
+    const exists = await page.$(`#${id}`);
+    if (!exists) fail(`missing journey element #${id}`);
+  }
+  const overlayHidden = await page.$eval("#world-journey-overlay", (el) => el.hidden);
+  if (!overlayHidden) fail("journey overlay should start hidden");
+
   if (errors.length) fail(`runtime errors:\n${errors.join("\n")}`);
   console.log(process.exitCode ? "JOURNEY SMOKE FAILED" : "JOURNEY SMOKE PASSED");
 } finally {

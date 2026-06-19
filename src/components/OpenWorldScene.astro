@@ -186,6 +186,30 @@ const experiencesJson = toJsonScript(experiences);
     </article>
   </div>
 
+  <!-- Post journey overlay -->
+  <div class="world-journey-overlay" id="world-journey-overlay" hidden aria-hidden="true">
+    <article class="world-journey-card" role="dialog" aria-modal="true" aria-labelledby="world-journey-title">
+      <header class="world-journey-head">
+        <p class="world-journey-progress" id="world-journey-progress"></p>
+        <button id="world-journey-close" class="world-modal-close" type="button" aria-label="Close section">&times; Close</button>
+      </header>
+      <h2 class="world-journey-title" id="world-journey-title"></h2>
+      <div class="world-journey-body post-content" id="world-journey-body"></div>
+      <footer class="world-journey-actions">
+        <button class="hud-btn" id="world-journey-prev" type="button">&larr; Prev</button>
+        <a class="hud-btn hud-btn-ghost" id="world-journey-plain" href="#">Read plain article</a>
+        <button class="hud-btn" id="world-journey-next" type="button">Next &rarr;</button>
+      </footer>
+    </article>
+  </div>
+
+  <!-- Journey HUD chip (visible only during a journey) -->
+  <div class="world-journey-hud" id="world-journey-hud" hidden aria-hidden="true">
+    <span class="world-journey-hud-label">TRANSMISSION</span>
+    <span class="world-journey-hud-progress" id="world-journey-hud-progress">0 / 0</span>
+    <button class="hud-btn hud-btn-ghost" id="world-journey-leave" type="button">Leave [Esc]</button>
+  </div>
+
   <script id="world-data-projects" type="application/json" set:html={projectsJson} />
   <script id="world-data-posts" type="application/json" set:html={postsJson} />
   <script id="world-data-experiences" type="application/json" set:html={experiencesJson} />
@@ -195,4 +219,76 @@ const experiencesJson = toJsonScript(experiences);
   </script>
 
   <VirtualJoystick />
+
+  <style>
+    .world-journey-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      place-items: center;
+      padding: clamp(1rem, 4vw, 3rem);
+      background: radial-gradient(circle at 50% 30%, rgba(0, 40, 56, 0.55), rgba(2, 8, 14, 0.86));
+      backdrop-filter: blur(6px);
+    }
+    .world-journey-overlay[hidden] { display: none; }
+    .world-journey-card {
+      width: min(720px, 100%);
+      max-height: 84vh;
+      overflow-y: auto;
+      border-radius: 18px;
+      border: 1px solid color-mix(in srgb, var(--district-accent, #00e5ff) 35%, transparent);
+      background: linear-gradient(160deg, rgba(6, 22, 30, 0.95), rgba(3, 12, 18, 0.97));
+      box-shadow: 0 0 48px color-mix(in srgb, var(--district-accent, #00e5ff) 22%, transparent);
+      padding: clamp(1.2rem, 3vw, 2rem);
+      color: #d7f6ff;
+    }
+    .world-journey-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.4rem;
+    }
+    .world-journey-progress {
+      font-size: 0.78rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--district-accent, #00e5ff);
+      margin: 0;
+    }
+    .world-journey-title { margin: 0 0 1rem; line-height: 1.15; }
+    .world-journey-body { font-size: 1rem; line-height: 1.7; }
+    .world-journey-body :is(pre, code) { white-space: pre-wrap; word-break: break-word; }
+    .world-journey-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-top: 1.4rem;
+      justify-content: space-between;
+    }
+    .world-journey-hud {
+      position: fixed;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in srgb, var(--district-accent, #00e5ff) 40%, transparent);
+      background: rgba(4, 16, 22, 0.82);
+      color: #d7f6ff;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+    }
+    .world-journey-hud[hidden] { display: none; }
+    .world-journey-hud-label { color: var(--district-accent, #00e5ff); letter-spacing: 0.2em; }
+    .world-journey-hud-progress { font-variant-numeric: tabular-nums; }
+    @media (prefers-reduced-motion: reduce) {
+      .world-journey-overlay { backdrop-filter: none; }
+    }
+  </style>
 </section>
