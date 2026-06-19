@@ -34,6 +34,7 @@ import { createWarpController, createStarmap } from "./open-world-travel.js";
 import { createPlayer, updatePlayer } from "./open-world-player.js";
 import { createGroundFx } from "./open-world-fx.js";
 import { getHudElements, createMinimap, createQuickLook } from "./open-world-hud.js";
+import { fetchPostSections } from "./post-content.js";
 
 let cleanupCurrent = null;
 let _booted = false;
@@ -87,6 +88,11 @@ const bootOpenWorld = () => {
     posts: parseJsonNode("world-data-posts"),
     experiences: parseJsonNode("world-data-experiences")
   };
+
+  // Debug/test hook — drives the journey smoke harness; harmless in production.
+  window.__wbTest = window.__wbTest || {};
+  window.__wbTest.postSlug = (i) => (content.posts[i] || {}).slug || null;
+  window.__wbTest.fetchSections = (slug) => fetchPostSections(slug);
 
   // ── Platform ───────────────────────────────────────────────────
   const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
