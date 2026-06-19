@@ -20,6 +20,8 @@ export const createPostJourney = (opts) => {
   let active = false;
   let overlayOpen = false;
   let terminusMode = false;
+  let lastFocused = null;
+  let startEpoch = 0;
   let sections = [];
   let checkpoints = [];   // { index, root, spire, ring, teaser, pos, read }
   let segments = [];      // { mesh }
@@ -157,6 +159,7 @@ export const createPostJourney = (opts) => {
   };
 
   const showOverlay = () => {
+    lastFocused = document.activeElement;
     overlay.root.hidden = false;
     overlay.root.setAttribute("aria-hidden", "false");
     overlayOpen = true;
@@ -192,6 +195,8 @@ export const createPostJourney = (opts) => {
     overlayOpen = false;
     terminusMode = false;
     sounds.close && sounds.close();
+    if (lastFocused && lastFocused.focus) lastFocused.focus();
+    lastFocused = null;
   };
 
   const tryOpen = () => {
@@ -216,8 +221,10 @@ export const createPostJourney = (opts) => {
 
   const start = async (entry, originMesh) => {
     if (active) return;
+    const epoch = ++startEpoch;
     slug = entry.slug;
     const data = await fetchSections(slug);
+    if (epoch !== startEpoch) return;
     if (!data || !data.ok || !data.sections.length) {
       window.location.href = `/posts/${slug}/`; // graceful fallback to the article
       return;
@@ -246,6 +253,7 @@ export const createPostJourney = (opts) => {
 
   const leave = () => {
     if (!active) return;
+    startEpoch += 1;
     closeOverlay();
     clearTrail();
     group.visible = false;
@@ -306,11 +314,26 @@ export const createPostJourney = (opts) => {
   overlay.nextBtn.addEventListener("click", onNext);
   if (overlay.leaveBtn) overlay.leaveBtn.addEventListener("click", leave);
 
+  const onOverlayKeyDown = (event) => {
+    if (!overlayOpen || event.key !== "Tab") return;
+    event.preventDefault();
+    const candidates = [overlay.closeBtn, overlay.prevBtn, overlay.plainLink, overlay.nextBtn];
+    const focusables = candidates.filter((el) => el && !el.disabled && !el.hidden);
+    if (focusables.length === 0) return;
+    const idx = focusables.indexOf(document.activeElement);
+    const next = event.shiftKey
+      ? (idx <= 0 ? focusables.length - 1 : idx - 1)
+      : (idx + 1) % focusables.length;
+    focusables[next].focus();
+  };
+  window.addEventListener("keydown", onOverlayKeyDown);
+
   const dispose = () => {
     overlay.closeBtn.removeEventListener("click", closeOverlay);
     overlay.prevBtn.removeEventListener("click", onPrev);
     overlay.nextBtn.removeEventListener("click", onNext);
     if (overlay.leaveBtn) overlay.leaveBtn.removeEventListener("click", leave);
+    window.removeEventListener("keydown", onOverlayKeyDown);
     clearTrail();
     if (group.parent) group.parent.remove(group);
   };

@@ -485,7 +485,10 @@ const bootOpenWorld = () => {
       const idx = list.findIndex((p) => p.slug === journey.currentSlug);
       const nextEntry = idx >= 0 ? list[(idx + 1) % list.length] : list[0];
       journey.leave();
-      if (nextEntry) journey.start(nextEntry, null);
+      if (nextEntry) {
+        const nextNode = pack.entryMeshes.find((m) => m.userData.kind === "posts" && m.userData.entry.slug === nextEntry.slug);
+        journey.start(nextEntry, nextNode || null);
+      }
     },
     sounds: {
       start: () => safeAudio(() => playWarpCharge()),
@@ -500,6 +503,7 @@ const bootOpenWorld = () => {
     journey.start(content.posts[i], null);
     return { active: journey.active, sectionCount: journey.sectionCount };
   };
+  window.__wbTest.openSection = (i) => journey.openSectionByIndex(i);
   window.__wbTest.readAll = () => {
     const n = journey.sectionCount;
     for (let i = 0; i < n; i += 1) { journey.openSectionByIndex(i); journey.closeOverlay(); }

@@ -35,7 +35,9 @@ try {
 
   // ── Task 1: sectionizer returns sections matching the article's structure ──
   const slug = await page.evaluate(() => window.__wbTest && window.__wbTest.postSlug(0));
-  if (!slug) fail("no post slug exposed via __wbTest");
+  if (!slug) { fail("no post slug exposed via __wbTest"); }
+
+  if (slug) {
 
   const expectedCount = await page.evaluate(async (s) => {
     const res = await fetch(`/posts/${s}/`);
@@ -97,6 +99,23 @@ try {
     fail(`journey sectionCount ${started.sectionCount} != expected ${expectedCount}`);
   }
 
+  // ── FIX 1 smoke: focus-trap keeps activeElement inside #world-journey-overlay ──
+  await page.evaluate(() => window.__wbTest.openSection(0));
+  await page.waitForTimeout(100);
+  // Tab a few times and confirm focus stays within the overlay.
+  for (let t = 0; t < 4; t += 1) {
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(30);
+    const insideOverlay = await page.evaluate(() => {
+      const overlay = document.getElementById("world-journey-overlay");
+      return overlay && overlay.contains(document.activeElement);
+    });
+    if (!insideOverlay) fail(`focus escaped #world-journey-overlay on Tab press ${t + 1}`);
+  }
+  // Close overlay so readAll / leave still work as before.
+  await page.evaluate(() => { const btn = document.getElementById("world-journey-close"); if (btn) btn.click(); });
+  await page.waitForTimeout(100);
+
   const completed = await page.evaluate(() => window.__wbTest.readAll());
   if (completed.readCount !== completed.sectionCount) fail("readAll did not read every section");
   if (!completed.allRead) fail("allRead should be true after reading every section");
@@ -105,6 +124,8 @@ try {
   const left = await page.evaluate(() => window.__wbTest.leave());
   if (left.active) fail("journey should be inactive after leave");
   if (!left.worldVisible) fail("Signal nodes should be visible again after leave");
+
+  } // end if (slug)
 
   if (errors.length) fail(`runtime errors:\n${errors.join("\n")}`);
   console.log(process.exitCode ? "JOURNEY SMOKE FAILED" : "JOURNEY SMOKE PASSED");
