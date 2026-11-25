@@ -1,0 +1,26 @@
+---
+import AppLayout from "../layouts/AppLayout.astro";
+---
+
+<AppLayout title="404 | Willows Bell" description="Page not found.">
+  <section class="about-page">
+    <article class="personnel-file anim-fade-in">
+      <header class="file-header">
+        <div class="file-title-group">
+          <div class="file-meta">ERROR 404 // RECORD NOT FOUND</div>
+          <h1>SIGNAL LOST</h1>
+          <div class="file-meta" style="margin-top: 0.5rem; color: var(--accent-orange)">
+            The page you requested could not be found.
+          </div>
+        </div>
+      </header>
+
+      <div class="file-section anim-slide-up" style="animation-delay: 0.15s">
+        <div class="file-content" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a class="btn btn-primary" href="/">Return home</a>
+          <a class="btn btn-secondary" href="/posts/">Browse posts</a>
+        </div>
+      </div>
+    </article>
+  </section>
+</AppLayout>
