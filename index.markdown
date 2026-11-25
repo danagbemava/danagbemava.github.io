@@ -1,3 +1,0 @@
----
-layout: immersive_home
----

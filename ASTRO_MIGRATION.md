@@ -1,33 +1,38 @@
 # Astro Migration Notes
 
-This repo now includes an Astro app in parallel with the existing Jekyll files.
+The Jekyll → Astro migration is complete. The site is built only by Astro;
+the Jekyll files (`_config.yml`, `Gemfile`, `_layouts/`, `assets/`, root
+`*.markdown`/`*.html` pages) have been removed.
 
-## Why
+## Content
 
-- Full-viewport timeline scenes (not embedded in a narrow content wrapper)
-- Better control of 3D state, routing, and interaction logic
-- Cleaner path for future game-like features
+Write content directly in the Astro collections (schemas in `src/content/config.ts`):
 
-## New app entry points
+- Posts: `src/content/posts/YYYY-MM-DD-slug.md`
+- Projects: `src/content/projects/*.md`
+- Experiences: `src/content/experiences/*.md`
+- Experiments: `src/content/experiments/*.md`
+
+Post front matter:
+
+```yaml
+---
+title: "Post title"
+date: "YYYY-MM-DD"
+categories: space separated tags
+status: complete # or "incomplete" to hide it from the site
+---
+```
+
+The post URL is `/posts/<file name without .md>/`.
+
+## Routes
 
 - Home: `src/pages/index.astro`
-- Projects timeline: `src/pages/projects/index.astro`
-- Posts timeline: `src/pages/posts/index.astro`
-- Project detail route: `src/pages/projects/[slug].astro`
-- Post detail route: `src/pages/posts/[slug].astro`
-
-## Content workflow
-
-Keep writing in:
-
-- `_posts/*.md`
-- `_projects/*.md`
-
-Before dev/build, content is synced into Astro collections at `src/content/*` via:
-
-- `npm run sync-content`
-
-This is already part of `npm run dev` and `npm run build`.
+- Posts: `src/pages/posts/index.astro`, `src/pages/posts/[slug].astro`
+- Projects: `src/pages/projects/index.astro`, `src/pages/projects/[slug].astro`
+- Experiments, experiences, world, about, credits: `src/pages/*`
+- 404: `src/pages/404.astro`
 
 ## Run locally
 
@@ -43,6 +48,4 @@ This is already part of `npm run dev` and `npm run build`.
 
 - Workflow: `.github/workflows/deploy-astro-pages.yml`
 - Trigger: pushes to `main` (and manual runs)
-- Pages settings in repository:
-  - Go to `Settings -> Pages`
-  - Set `Source` to `GitHub Actions`
+- Repository setting: `Settings -> Pages -> Source` must be `GitHub Actions`

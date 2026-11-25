@@ -21,7 +21,8 @@ const defaultState = () => ({
   },
   secretsFound: 0,
   energyLevel: 0.62,
-  interactions: 0
+  interactions: 0,
+  journeyedPosts: {}
 });
 
 let cache = null;
@@ -47,7 +48,8 @@ const loadState = () => {
       ...fresh,
       ...parsed,
       visits: { ...fresh.visits, ...(parsed.visits || {}) },
-      discoveredSecrets: { ...fresh.discoveredSecrets, ...(parsed.discoveredSecrets || {}) }
+      discoveredSecrets: { ...fresh.discoveredSecrets, ...(parsed.discoveredSecrets || {}) },
+      journeyedPosts: { ...(parsed.journeyedPosts || {}) }
     };
   } catch {
     cache = fresh;
@@ -248,6 +250,24 @@ export const markSecretFound = (secretKey) => {
 };
 
 export const getSecretsFound = () => ({ ...loadState().discoveredSecrets });
+
+export const markPostJourneyed = (slug) => {
+  if (!slug) return false;
+  const state = loadState();
+  if (!state.journeyedPosts) state.journeyedPosts = {};
+  if (state.journeyedPosts[slug]) return false;
+  state.journeyedPosts[slug] = safeNow();
+  state.energyLevel = clamp(state.energyLevel + 0.05, 0.2, 1);
+  scheduleSave();
+  return true;
+};
+
+export const isPostJourneyed = (slug) => {
+  const map = loadState().journeyedPosts;
+  return Boolean(map && map[slug]);
+};
+
+export const getJourneyedPosts = () => ({ ...(loadState().journeyedPosts || {}) });
 
 export const zoneLabel = (zone) => zoneLabels[zone] || zone;
 

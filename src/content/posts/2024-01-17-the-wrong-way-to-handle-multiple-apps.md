@@ -3,6 +3,7 @@ layout: post
 title:  "The wrong way to handle multiple apps in a single project"
 date:   "2024-01-17"
 categories: mobile code-organization architecture
+status: incomplete
 ---
 
 ### Background 
